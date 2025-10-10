@@ -1,0 +1,60 @@
+[
+  {
+    "id": 1,
+    "name": "Modern Backpack",
+    "price": 49.99,
+    "image": "/images/products/backpack.jpg",
+    "images": ["/images/products/backpack.jpg", "/images/NoImage.jpg"],
+    "category": "Accessories",
+    "description": "This backpack is perfect for everyday use. It has a padded laptop compartment and plenty of pockets for all your essentials."
+  },
+  {
+    "id": 2,
+    "name": "Smart Watch",
+    "price": 129.99,
+    "image": "/images/products/smartwatch.jpg",
+    "images": ["/images/products/smartwatch.jpg", "/images/NoImage.jpg"],
+    "category": "Tech",
+    "description": "Stay connected with this sleek smart watch. It has a heart rate monitor, GPS, and a large display."
+  },
+  {
+    "id": 3,
+    "name": "Wireless Headphones",
+    "price": 89.99,
+    "image": "/images/products/headphones.jpg",
+    "images": [
+      "/images/products/headphones.jpg",
+      "/images/NoImage.jpg",
+      "/images/products/smartwatch.jpg"
+    ],
+    "category": "Tech",
+    "description": "Enjoy your music without the hassle of cords with these wireless headphones. They have a long battery life and are perfect for travel."
+  },
+  {
+    "id": 4,
+    "name": "Sunglasses",
+    "price": 59.99,
+    "image": "/images/products/sunglasses.jpg",
+    "images": ["/images/products/sunglasses.jpg", "/images/NoImage.jpg"],
+    "category": "Accessories",
+    "description": "Protect your eyes from the sun with these stylish sunglasses. They have polarized lenses and come in a variety of colors."
+  },
+  {
+    "id": 5,
+    "name": "Running Shoes",
+    "price": 99.99,
+    "image": "/images/products/shoes.jpg",
+    "images": ["/images/products/shoes.jpg", "/images/NoImage.jpg"],
+    "category": "Fashion",
+    "description": "This pair of shoes features a mesh upper with a stylish design and a simple color and silhouette that makes it easy to match with a variety of outfits."
+  },
+  {
+    "id": 6,
+    "name": "Basic T-Shirt",
+    "price": 19.99,
+    "image": "/images/products/tshirt.jpg",
+    "images": ["/images/products/tshirt.jpg", "/images/NoImage.jpg"],
+    "category": "Fashion",
+    "description": "This basic t-shirt is a wardrobe essential. It is made from soft cotton and has a comfortable fit."
+  }
+]
