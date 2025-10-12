@@ -1,4 +1,4 @@
-// File: C:\Users\ignja\Desktop\bloom-ecommerce-template\bloom-ecommerce-template\app\profile\page.tsx
+// File: C:\Users\ignja\Documents\semestre 8\Proyeccto de Titulo\comprautos\app\profile\page.tsx
 import * as entry from '../../../../app/profile/page.js'
 import type { ResolvingMetadata, ResolvingViewport } from 'next/dist/lib/metadata/types/metadata-interface.js'
 

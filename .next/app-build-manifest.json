@@ -16,20 +16,15 @@
       "static/chunks/main-app.js",
       "static/chunks/app/profile/page.js"
     ],
-    "/about/page": [
+    "/shop/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/about/page.js"
+      "static/chunks/app/shop/page.js"
     ],
-    "/contact/page": [
+    "/comparativa/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/contact/page.js"
-    ],
-    "/login/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/login/page.js"
+      "static/chunks/app/comparativa/page.js"
     ]
   }
 }

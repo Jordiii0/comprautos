@@ -12,9 +12,9 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "Bloom E-Commerce Template",
+  title: "carNETwork - CompraAutos.cl",
   description:
-    "Discover a wide selection of trendy clothes, shoes and accessories on Bloom E-Commerce. Enjoy fast delivery and free returns. Shop now!",
+    "Compara y encuentra el vehículo ideal para ti. Explora precios, modelos, años y características de diferentes concesionarios y particulares en un solo lugar, y toma decisiones inteligentes al comprar tu próximo auto!",
 };
 
 export default function RootLayout({

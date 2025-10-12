@@ -80,13 +80,13 @@ const HeroCarousel: React.FC = () => {
                   href="/about"
                   className="rounded-full bg-white/90 px-8 py-3 text-sm font-semibold text-gray-900 backdrop-blur-md hover:bg-white transition"
                 >
-                  About Us
+                  Inicia Sesión
                 </a>
                 <a
                   href="/shop"
                   className="rounded-full border border-white px-8 py-3 text-sm font-semibold text-white hover:bg-white hover:text-gray-900 transition"
                 >
-                  Discover Our Products
+                  Descubre nuestros catálogo
                 </a>
               </div>
             </div>
