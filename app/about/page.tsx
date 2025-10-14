@@ -5,28 +5,24 @@ export default function AboutUs() {
     <div className="bg-white py-12">
       <div className="mx-auto">
         <div className="text-center mb-16">
-          <h1 className="text-4xl font-bold text-gray-900 mb-4">About Us</h1>
+          <h1 className="text-4xl font-bold text-gray-900 mb-4">Sobre Nosotros</h1>
           <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-            We are a passionate team dedicated to providing high-quality
-            products and exceptional customer service. Our mission is to make
-            your shopping experience seamless and enjoyable.
+           En carNETwork: La Mejor Asesoría en Automóviles, nos apasiona ayudarte a encontrar el vehículo ideal para tus necesidades. Somos una plataforma dedicada a centralizar y comparar la oferta automotriz de distintos concesionarios y vendedores del país, brindándote información clara, actualizada y confiable para tomar la mejor decisión de compra.
           </p>
         </div>
 
         <section className="relative w-full bg-[url(/images/about/team.jpg)] bg-cover bg-center bg-no-repeat">
           <div className="relative flex items-center justify-end h-screen px-6 sm:px-12 lg:px-24">
             <div className="max-w-xl p-8 rounded-lg text-white">
-              <h1 className="text-3xl font-extrabold sm:text-5xl">Our Story</h1>
+              <h1 className="text-3xl font-extrabold sm:text-5xl">Nuestra Historia</h1>
 
               <p className="mt-4 sm:text-xl">
-                Founded in 2023, Bloom started as a small online store with a
-                big dream: to revolutionize the way people shop for fashion and
-                tech accessories.
+                carNETwork nació con el propósito de simplificar la búsqueda y compra de automóviles. Detectamos la necesidad de una plataforma que reuniera en un solo lugar la oferta de distintos concesionarios y vendedores, permitiendo comparar precios, modelos y condiciones de forma clara y segura.
+
               </p>
 
               <p className="mt-4 sm:text-xl">
-                Our journey has been fueled by our love for innovation and our
-                desire to create a community of happy customers.
+                Desde entonces, trabajamos para ofrecer una experiencia confiable, transparente y moderna, ayudando a cada persona a encontrar el vehículo ideal según sus necesidades.
               </p>
             </div>
           </div>
@@ -37,20 +33,15 @@ export default function AboutUs() {
           <div className="relative flex items-center justify-start h-screen px-6 sm:px-12 lg:px-24">
             <div className="max-w-xl p-8 rounded-lg text-white">
               <h1 className="text-3xl font-extrabold sm:text-5xl">
-                Our Mission
+                Nuestra Misión
               </h1>
 
               <p className="mt-4 sm:text-xl">
-                At Bloom, our mission is simple: to provide you with the best
-                products at the best prices, while delivering an unparalleled
-                shopping experience. We carefully select every item in our store
-                to ensure it meets our high standards of quality and style.
+                Nuestra misión es facilitar la elección del vehículo perfecto para cada persona, ofreciendo una plataforma digital confiable que centraliza, compara y asesora en la compra de automóviles nuevos y usados en todo el país.
               </p>
 
               <p className="mt-4 sm:text-xl">
-                We are committed to sustainability and ethical practices. From
-                our supply chain to our packaging, we strive to minimize our
-                environmental impact and support fair labor practices.
+                Buscamos simplificar el proceso de búsqueda y decisión, brindando información transparente, actualizada y objetiva, que permita a nuestros usuarios ahorrar tiempo, dinero y esfuerzo, asegurando siempre una experiencia de compra segura y satisfactoria.
               </p>
             </div>
           </div>
@@ -58,93 +49,90 @@ export default function AboutUs() {
 
         <div className="mb-16 m-8">
           <h2 className="text-center text-3xl font-bold text-gray-900 mb-8">
-            Meet Our Team
+            EL EQUIPO
           </h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
             <div className="text-center">
               <Image
-                src="/images/team/ceo.jpg"
+                src="/images/team/javier.jpg"
                 alt="Team Member 1"
                 className="w-32 h-32 rounded-full mx-auto mb-4 object-cover"
                 width={300}
                 height={300}
               />
-              <h3 className="text-xl font-semibold text-gray-900">John Doe</h3>
+              <h3 className="text-xl font-semibold text-gray-900">Javier Veloso</h3>
               <p className="text-gray-600">CEO & Founder</p>
             </div>
 
             <div className="text-center">
               <Image
-                src="/images/team/marketing.jpg"
+                src="/images/team/tomas.jpg"
                 alt="Team Member 2"
                 className="w-32 h-32 rounded-full mx-auto mb-4 object-cover"
                 width={300}
                 height={300}
               />
               <h3 className="text-xl font-semibold text-gray-900">
-                Jane Smith
+                Tomás Mariscal
               </h3>
               <p className="text-gray-600">Head of Marketing</p>
             </div>
 
             <div className="text-center">
               <Image
-                src="/images/team/dev.jpg"
+                src="/images/team/matias.jpg"
                 alt="Team Member 3"
                 className="w-32 h-32 rounded-full mx-auto mb-4 object-cover"
                 width={300}
                 height={300}
               />
               <h3 className="text-xl font-semibold text-gray-900">
-                Mike Johnson
+                Matías Pardo
               </h3>
               <p className="text-gray-600">Lead Developer</p>
             </div>
 
             <div className="text-center">
               <Image
-                src="/images/team/support.jpg"
+                src="/images/team/felipe.jpg"
                 alt="Team Member 4"
                 className="w-32 h-32 rounded-full mx-auto mb-4 object-cover"
                 width={300}
                 height={300}
               />
-              <h3 className="text-xl font-semibold text-gray-900">Sarah Lee</h3>
+              <h3 className="text-xl font-semibold text-gray-900">Felipe Catalán</h3>
               <p className="text-gray-600">Customer Support</p>
             </div>
           </div>
         </div>
 
         <div className="text-center mx-8">
-          <h2 className="text-3xl font-bold text-gray-900 mb-8">Our Values</h2>
+          <h2 className="text-3xl font-bold text-gray-900 mb-8">Nuestros Valores</h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             <div className="bg-gray-50 p-6 rounded-lg shadow-sm">
               <h3 className="text-xl font-semibold text-gray-900 mb-4">
-                Quality
+                Calidad
               </h3>
               <p className="text-gray-600">
-                We are committed to offering only the best products, carefully
-                curated to meet your needs.
+                Nos comprometemos a ofrecer información precisa, actualizada y confiable, garantizando una experiencia de comparación y compra de vehículos con los más altos estándares de excelencia.
               </p>
             </div>
 
             <div className="bg-gray-50 p-6 rounded-lg shadow-sm">
               <h3 className="text-xl font-semibold text-gray-900 mb-4">
-                Sustainability
+                Sustentabilidad
               </h3>
               <p className="text-gray-600">
-                We prioritize eco-friendly practices and sustainable sourcing in
-                everything we do.
+                Promovemos prácticas responsables y sostenibles dentro del sector automotriz, fomentando la elección de vehículos eficientes y el uso de tecnologías que contribuyan al cuidado del medio ambiente.
               </p>
             </div>
 
             <div className="bg-gray-50 p-6 rounded-lg shadow-sm">
               <h3 className="text-xl font-semibold text-gray-900 mb-4">
-                Customer Focus
+                Enfoque al Cliente
               </h3>
               <p className="text-gray-600">
-                Your satisfaction is our top priority. We go above and beyond to
-                ensure you have a great experience.
+                Nuestros usuarios son el centro de todo lo que hacemos. Escuchamos sus necesidades y trabajamos constantemente para brindar un servicio cercano, transparente y orientado a su satisfacción.
               </p>
             </div>
           </div>

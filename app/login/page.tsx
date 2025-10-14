@@ -3,17 +3,19 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabaseClient';
-import { Lock, Mail, AlertCircle } from 'lucide-react';
+import { Lock, Mail, AlertCircle, UserPlus } from 'lucide-react';
 
 export default function LoginPage() {
   const router = useRouter();
+  const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [successMessage, setSuccessMessage] = useState('');
 
   useEffect(() => {
-    // Verificar si ya está autenticado
     const checkUser = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (session) {
@@ -51,10 +53,70 @@ export default function LoginPage() {
     }
   };
 
+  const handleRegister = async () => {
+    setError('');
+    setSuccessMessage('');
+    setLoading(true);
+
+    if (!email || !password || !confirmPassword) {
+      setError('Por favor completa todos los campos');
+      setLoading(false);
+      return;
+    }
+
+    if (password.length < 6) {
+      setError('La contraseña debe tener al menos 6 caracteres');
+      setLoading(false);
+      return;
+    }
+
+    if (password !== confirmPassword) {
+      setError('Las contraseñas no coinciden');
+      setLoading(false);
+      return;
+    }
+
+    try {
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+      });
+
+      if (error) throw error;
+
+      if (data.user) {
+        setSuccessMessage('¡Cuenta creada exitosamente! Redirigiendo...');
+        setTimeout(() => {
+          router.push('/profile');
+        }, 2000);
+      }
+    } catch (error: any) {
+      setError(error.message || 'Error al crear la cuenta');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSubmit = () => {
+    if (isLogin) {
+      handleLogin();
+    } else {
+      handleRegister();
+    }
+  };
+
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !loading) {
-      handleLogin();
+      handleSubmit();
     }
+  };
+
+  const switchMode = () => {
+    setIsLogin(!isLogin);
+    setError('');
+    setSuccessMessage('');
+    setPassword('');
+    setConfirmPassword('');
   };
 
   return (
@@ -62,10 +124,18 @@ export default function LoginPage() {
       <div className="bg-white rounded-lg shadow-xl p-8 w-full max-w-md">
         <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center w-16 h-16 bg-indigo-100 rounded-full mb-4">
-            <Lock className="w-8 h-8 text-indigo-600" />
+            {isLogin ? (
+              <Lock className="w-8 h-8 text-indigo-600" />
+            ) : (
+              <UserPlus className="w-8 h-8 text-indigo-600" />
+            )}
           </div>
-          <h1 className="text-3xl font-bold text-gray-800">Iniciar Sesión</h1>
-          <p className="text-gray-600 mt-2">Accede a tu cuenta</p>
+          <h1 className="text-3xl font-bold text-gray-800">
+            {isLogin ? 'Iniciar Sesión' : 'Crear Cuenta'}
+          </h1>
+          <p className="text-gray-600 mt-2">
+            {isLogin ? 'Accede a tu cuenta' : 'Regístrate para comenzar'}
+          </p>
         </div>
 
         <div className="space-y-6">
@@ -103,7 +173,32 @@ export default function LoginPage() {
                 disabled={loading}
               />
             </div>
+            {!isLogin && (
+              <p className="text-xs text-gray-500 mt-1">
+                Mínimo 6 caracteres
+              </p>
+            )}
           </div>
+
+          {!isLogin && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Confirmar Contraseña
+              </label>
+              <div className="relative">
+                <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+                <input
+                  type="password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  onKeyPress={handleKeyPress}
+                  className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                  placeholder="••••••••"
+                  disabled={loading}
+                />
+              </div>
+            </div>
+          )}
 
           {error && (
             <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm flex items-center gap-2">
@@ -112,12 +207,39 @@ export default function LoginPage() {
             </div>
           )}
 
+          {successMessage && (
+            <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg text-sm flex items-center gap-2">
+              <span>✓ {successMessage}</span>
+            </div>
+          )}
+
           <button
-            onClick={handleLogin}
+            onClick={handleSubmit}
             disabled={loading}
             className="w-full bg-indigo-600 text-white py-3 rounded-lg font-semibold hover:bg-indigo-700 transition-colors shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {loading ? 'Iniciando sesión...' : 'Iniciar Sesión'}
+            {loading ? (
+              isLogin ? 'Iniciando sesión...' : 'Creando cuenta...'
+            ) : (
+              isLogin ? 'Iniciar Sesión' : 'Crear Cuenta'
+            )}
+          </button>
+
+          <div className="relative">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t border-gray-300"></div>
+            </div>
+            <div className="relative flex justify-center text-sm">
+              <span className="px-2 bg-white text-gray-500">o</span>
+            </div>
+          </div>
+
+          <button
+            onClick={switchMode}
+            disabled={loading}
+            className="w-full text-indigo-600 hover:text-indigo-700 font-medium transition-colors disabled:opacity-50"
+          >
+            {isLogin ? '¿No tienes cuenta? Créala aquí' : '¿Ya tienes cuenta? Inicia sesión'}
           </button>
         </div>
       </div>
