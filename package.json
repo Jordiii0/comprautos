@@ -10,7 +10,7 @@
   },
   "dependencies": {
     "@next-auth/supabase-adapter": "^0.2.1",
-    "@supabase/supabase-js": "^2.57.4",
+    "@supabase/supabase-js": "^2.75.0",
     "@types/react-router-dom": "^5.3.3",
     "framer-motion": "^12.23.12",
     "lucide-react": "^0.545.0",

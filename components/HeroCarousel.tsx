@@ -14,18 +14,18 @@ const HeroCarousel: React.FC = () => {
   const slides: Slide[] = [
     {
       image: '/images/banner.jpg',
-      title: 'Where Style Meets Innovation',
-      subtitle: 'Discover curated fashion and cutting-edge accessories.'
+      title: 'Donde el estilo se encuentra con la innovación',
+      subtitle: 'Descubre un gran catalogo de vehículos.'
     },
     {
       image: '/images/banner2.jpg',
-      title: 'Elevate Your Wardrobe',
-      subtitle: 'Timeless pieces for the modern individual.'
+      title: 'Elige la mejor opción para ti!',
+      subtitle: 'Descubre un gran catalogo de vehículos.'
     },
     {
       image: '/images/banner3.jpg',
-      title: 'New Collection Arrives',
-      subtitle: 'Explore the latest trends and exclusive designs.'
+      title: 'Nuevos Vehiculos!',
+      subtitle: 'Descubre un gran catalogo de vehículos.'
     }
   ];
 
@@ -77,7 +77,7 @@ const HeroCarousel: React.FC = () => {
 
               <div className="mt-8 flex flex-wrap gap-4 animate-fade-in-delay-2">
                 <a
-                  href="/about"
+                  href="/login"
                   className="rounded-full bg-white/90 px-8 py-3 text-sm font-semibold text-gray-900 backdrop-blur-md hover:bg-white transition"
                 >
                   Inicia Sesión

@@ -22,13 +22,13 @@ export default function Header() {
 
             <nav className="hidden md:flex items-center space-x-8 text-sm font-medium">
               <Link href="/shop" className="hover:text-black transition">
-                Shop
+                Tienda
               </Link>
               <Link href="/about" className="hover:text-black transition">
-                About
+                Sobre Nosotros
               </Link>
               <Link href="/contact" className="hover:text-black transition">
-                Contact
+                Contactos
               </Link>
             </nav>
           </div>
@@ -102,16 +102,16 @@ export default function Header() {
         {isMobileOpen && (
           <nav className="md:hidden mt-4 flex flex-col space-y-3 text-sm font-medium text-gray-700">
             <Link href="/shop" className="hover:text-black transition">
-              Shop
+              Teinda
             </Link>
             <Link href="/about" className="hover:text-black transition">
-              About
+              Sobre Nosotros
             </Link>
             <Link href="/contact" className="hover:text-black transition">
-              Contact
+              Contactos
             </Link>
             <Link href="/login" className="hover:text-black transition">
-              Sign In
+              Iniciar Sesión
             </Link>
           </nav>
         )}
