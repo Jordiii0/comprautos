@@ -1,9 +1,22 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
-import { supabase } from '@/lib/supabaseClient';
-import { User, LogOut, UserCircle, Mail, Calendar, Loader2, Phone, MapPin, Save, Edit2 } from 'lucide-react';
+import React, { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { Plus } from "lucide-react";
+import { List } from 'lucide-react';
+import { supabase } from "@/lib/supabaseClient";
+import {
+  User,
+  LogOut,
+  UserCircle,
+  Mail,
+  Calendar,
+  Loader2,
+  Phone,
+  MapPin,
+  Save,
+  Edit2,
+} from "lucide-react";
 
 interface UserProfile {
   id: string;
@@ -20,22 +33,22 @@ interface ProfileData {
 }
 
 const REGIONES_CHILE = [
-  'Arica y Parinacota',
-  'Tarapacá',
-  'Antofagasta',
-  'Atacama',
-  'Coquimbo',
-  'Valparaíso',
-  'Metropolitana de Santiago',
-  'O\'Higgins',
-  'Maule',
-  'Ñuble',
-  'Biobío',
-  'La Araucanía',
-  'Los Ríos',
-  'Los Lagos',
-  'Aysén',
-  'Magallanes'
+  "Arica y Parinacota",
+  "Tarapacá",
+  "Antofagasta",
+  "Atacama",
+  "Coquimbo",
+  "Valparaíso",
+  "Metropolitana de Santiago",
+  "O'Higgins",
+  "Maule",
+  "Ñuble",
+  "Biobío",
+  "La Araucanía",
+  "Los Ríos",
+  "Los Lagos",
+  "Aysén",
+  "Magallanes",
 ];
 
 export default function ProfilePage() {
@@ -44,22 +57,24 @@ export default function ProfilePage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
-  const [successMessage, setSuccessMessage] = useState('');
-  
+  const [successMessage, setSuccessMessage] = useState("");
+
   const [profileData, setProfileData] = useState<ProfileData>({
-    full_name: '',
-    username: '',
-    phone: '+56',
-    region: '',
-    city: ''
+    full_name: "",
+    username: "",
+    phone: "+56",
+    region: "",
+    city: "",
   });
 
   useEffect(() => {
     const getUser = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
       if (!session) {
-        router.push('/login');
+        router.push("/login");
         return;
       }
 
@@ -70,9 +85,11 @@ export default function ProfilePage() {
 
     getUser();
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
       if (!session) {
-        router.push('/login');
+        router.push("/login");
       }
     });
 
@@ -82,68 +99,72 @@ export default function ProfilePage() {
   const loadProfile = async (userId: string) => {
     try {
       const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', userId)
+        .from("profiles")
+        .select("*")
+        .eq("id", userId)
         .single();
 
-      if (error && error.code !== 'PGRST116') {
-        console.error('Error loading profile:', error);
+      if (error && error.code !== "PGRST116") {
+        console.error("Error loading profile:", error);
         return;
       }
 
       if (data) {
         setProfileData({
-          full_name: data.full_name || '',
-          username: data.username || '',
-          phone: data.phone || '+56',
-          region: data.region || '',
-          city: data.city || ''
+          full_name: data.full_name || "",
+          username: data.username || "",
+          phone: data.phone || "+56",
+          region: data.region || "",
+          city: data.city || "",
         });
       } else {
         setIsEditing(true);
       }
     } catch (error) {
-      console.error('Error:', error);
+      console.error("Error:", error);
     }
   };
 
   const handleSave = async () => {
     if (!user) return;
 
-    if (!profileData.full_name || !profileData.username || !profileData.phone || !profileData.region || !profileData.city) {
-      alert('Por favor completa todos los campos');
+    if (
+      !profileData.full_name ||
+      !profileData.username ||
+      !profileData.phone ||
+      !profileData.region ||
+      !profileData.city
+    ) {
+      alert("Por favor completa todos los campos");
       return;
     }
 
-    if (!profileData.phone.startsWith('+56')) {
-      alert('El número debe comenzar con +56');
+    if (!profileData.phone.startsWith("+56")) {
+      alert("El número debe comenzar con +56");
       return;
     }
 
     setSaving(true);
-    setSuccessMessage('');
+    setSuccessMessage("");
 
     try {
-      const { error } = await supabase
-        .from('profiles')
-        .upsert({
-          id: user.id,
-          full_name: profileData.full_name,
-          username: profileData.username,
-          phone: profileData.phone,
-          region: profileData.region,
-          city: profileData.city,
-          updated_at: new Date().toISOString()
-        });
+      const { error } = await supabase.from("profiles").upsert({
+        id: user.id,
+        full_name: profileData.full_name,
+        username: profileData.username,
+        phone: profileData.phone,
+        region: profileData.region,
+        city: profileData.city,
+        updated_at: new Date().toISOString(),
+      });
 
       if (error) throw error;
 
-      setSuccessMessage('Perfil guardado exitosamente');
+      setSuccessMessage("Perfil guardado exitosamente");
       setIsEditing(false);
-      setTimeout(() => setSuccessMessage(''), 3000);
+      setTimeout(() => setSuccessMessage(""), 3000);
     } catch (error: any) {
-      alert('Error al guardar el perfil: ' + error.message);
+      alert("Error al guardar el perfil: " + error.message);
     } finally {
       setSaving(false);
     }
@@ -151,12 +172,12 @@ export default function ProfilePage() {
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
-    router.push('/login');
+    router.push("/login");
   };
 
   const handlePhoneChange = (value: string) => {
-    if (!value.startsWith('+56')) {
-      setProfileData({ ...profileData, phone: '+56' });
+    if (!value.startsWith("+56")) {
+      setProfileData({ ...profileData, phone: "+56" });
     } else {
       setProfileData({ ...profileData, phone: value });
     }
@@ -178,10 +199,10 @@ export default function ProfilePage() {
   }
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('es-ES', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric'
+    return new Date(dateString).toLocaleDateString("es-ES", {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
     });
   };
 
@@ -203,7 +224,7 @@ export default function ProfilePage() {
       <div className="max-w-4xl mx-auto p-6 mt-8">
         <div className="bg-white rounded-lg shadow-xl overflow-hidden">
           <div className="bg-gradient-to-r from-indigo-500 to-purple-600 h-32"></div>
-          
+
           <div className="relative px-8 pb-8">
             <div className="flex items-end justify-between -mt-16 mb-6">
               <div className="flex items-end">
@@ -212,21 +233,41 @@ export default function ProfilePage() {
                 </div>
                 <div className="ml-6 mb-4">
                   <h2 className="text-3xl font-bold text-gray-800">
-                    {profileData.full_name || 'Completa tu perfil'}
+                    {profileData.full_name || "Completa tu perfil"}
                   </h2>
-                  <p className="text-gray-600">@{profileData.username || 'usuario'}</p>
+                  <p className="text-gray-600">
+                    @{profileData.username || "usuario"}
+                  </p>
                 </div>
               </div>
-              
-              {!isEditing && (
+
+              <div className="flex items-center gap-3 mb-4">
                 <button
-                  onClick={() => setIsEditing(true)}
-                  className="mb-4 flex items-center gap-2 bg-indigo-500 text-white px-4 py-2 rounded-lg hover:bg-indigo-600 transition-colors"
+                  onClick={() => router.push("/publication")}
+                  className="flex items-center gap-2 bg-green-500 text-white px-4 py-2 rounded-lg hover:bg-green-600 transition-colors shadow-md"
                 >
-                  <Edit2 className="w-4 h-4" />
-                  Editar
+                  <Plus className="w-4 h-4" />
+                  Publicar
                 </button>
-              )}
+
+                <button
+                  onClick={() => router.push("/mypost")}
+                  className="flex items-center gap-2 bg-purple-500 text-white px-4 py-2 rounded-lg hover:bg-purple-600 transition-colors shadow-md"
+                >
+                  <List className="w-4 h-4" />
+                  Mis Publicaciones
+                </button>
+
+                {!isEditing && (
+                  <button
+                    onClick={() => setIsEditing(true)}
+                    className="flex items-center gap-2 bg-indigo-500 text-white px-4 py-2 rounded-lg hover:bg-indigo-600 transition-colors shadow-md"
+                  >
+                    <Edit2 className="w-4 h-4" />
+                    Editar
+                  </button>
+                )}
+              </div>
             </div>
 
             {successMessage && (
@@ -240,10 +281,12 @@ export default function ProfilePage() {
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-3">
                     <User className="w-6 h-6 text-indigo-600" />
-                    <h3 className="text-lg font-semibold text-gray-800">Información Personal</h3>
+                    <h3 className="text-lg font-semibold text-gray-800">
+                      Información Personal
+                    </h3>
                   </div>
                 </div>
-                
+
                 <div className="grid md:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -252,7 +295,12 @@ export default function ProfilePage() {
                     <input
                       type="text"
                       value={profileData.full_name}
-                      onChange={(e) => setProfileData({ ...profileData, full_name: e.target.value })}
+                      onChange={(e) =>
+                        setProfileData({
+                          ...profileData,
+                          full_name: e.target.value,
+                        })
+                      }
                       disabled={!isEditing}
                       className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent disabled:bg-gray-100 disabled:text-gray-600"
                       placeholder="Juan Pérez González"
@@ -266,7 +314,14 @@ export default function ProfilePage() {
                     <input
                       type="text"
                       value={profileData.username}
-                      onChange={(e) => setProfileData({ ...profileData, username: e.target.value.toLowerCase().replace(/\s/g, '') })}
+                      onChange={(e) =>
+                        setProfileData({
+                          ...profileData,
+                          username: e.target.value
+                            .toLowerCase()
+                            .replace(/\s/g, ""),
+                        })
+                      }
                       disabled={!isEditing}
                       className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent disabled:bg-gray-100 disabled:text-gray-600"
                       placeholder="juanperez"
@@ -295,7 +350,7 @@ export default function ProfilePage() {
                     </label>
                     <input
                       type="email"
-                      value={user?.email || ''}
+                      value={user?.email || ""}
                       disabled
                       className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-gray-100 text-gray-600"
                     />
@@ -308,13 +363,20 @@ export default function ProfilePage() {
                     </label>
                     <select
                       value={profileData.region}
-                      onChange={(e) => setProfileData({ ...profileData, region: e.target.value })}
+                      onChange={(e) =>
+                        setProfileData({
+                          ...profileData,
+                          region: e.target.value,
+                        })
+                      }
                       disabled={!isEditing}
                       className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent disabled:bg-gray-100 disabled:text-gray-600"
                     >
                       <option value="">Selecciona una región</option>
                       {REGIONES_CHILE.map((region) => (
-                        <option key={region} value={region}>{region}</option>
+                        <option key={region} value={region}>
+                          {region}
+                        </option>
                       ))}
                     </select>
                   </div>
@@ -326,7 +388,9 @@ export default function ProfilePage() {
                     <input
                       type="text"
                       value={profileData.city}
-                      onChange={(e) => setProfileData({ ...profileData, city: e.target.value })}
+                      onChange={(e) =>
+                        setProfileData({ ...profileData, city: e.target.value })
+                      }
                       disabled={!isEditing}
                       className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent disabled:bg-gray-100 disabled:text-gray-600"
                       placeholder="Santiago"

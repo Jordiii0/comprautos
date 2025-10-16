@@ -1,3 +1,15 @@
+
+/* | Función             | Qué hace                                               |
+| ------------------- | ------------------------------------------------------ |
+| 🛍️ `cart`          | Guarda todos los productos añadidos al carrito.        |
+| ➕ `addToCart`       | Agrega un producto o aumenta su cantidad si ya existe. |
+| ➖ `removeFromCart`  | Elimina un producto del carrito.                       |
+| 🔁 `updateQuantity` | Cambia la cantidad manualmente.                        |
+| 🧹 `clearCart`      | Vacía completamente el carrito.                        |
+| 💾 `localStorage`   | Guarda los datos del carrito entre recargas.           |
+| 🌍 `CartProvider`   | Hace que el carrito esté disponible globalmente.       |
+ */
+
 "use client";
 
 import React, { createContext, useContext, useEffect, useState } from "react";

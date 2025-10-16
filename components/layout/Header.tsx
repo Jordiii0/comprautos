@@ -1,13 +1,10 @@
 "use client";
 
-import { useCart } from "@/context/CartContext";
 import Link from "next/link";
 import { useState, useEffect } from "react";
 import { ShoppingCart, User, Menu, X, ChevronDown } from "lucide-react";
 
 export default function Header() {
-  const { cart } = useCart();
-  const cartCount = cart.reduce((total, item) => total + item.quantity, 0);
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
 
@@ -83,14 +80,6 @@ export default function Header() {
             <Link href="/cart">
               <div className="relative group">
                 <div className="p-2 lg:px-4 lg:py-2 rounded-xl hover:bg-gray-100 transition-all duration-200 flex items-center space-x-2">
-                  <div className="relative">
-                    <ShoppingCart className="w-5 h-5 lg:w-6 lg:h-6 text-gray-700 group-hover:text-indigo-600 transition-colors" />
-                    {cartCount > 0 && (
-                      <span className="absolute -top-2 -right-2 bg-gradient-to-r from-indigo-600 to-purple-600 text-white text-[10px] font-bold rounded-full w-5 h-5 flex items-center justify-center shadow-lg animate-bounce">
-                        {cartCount}
-                      </span>
-                    )}
-                  </div>
                   <span className="hidden lg:block text-sm font-semibold text-gray-700 group-hover:text-indigo-600 transition-colors">
                     Carrito
                   </span>
