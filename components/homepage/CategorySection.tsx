@@ -4,12 +4,13 @@ import Link from "next/link";
 export default function CategorySection() {
   return (
     <section className="mt-8 m-4 p-8 rounded-xl">
-      <h1 className="text-4xl font-bold text-gray-800 text-center mb-12">
-        Vehículos
+      <h1 className="text-4xl md:text-5xl font-extrabold text-gray-800 text-center mb-12 tracking-tight leading-tight drop-shadow-sm">
+        <span className="text-red-600">Busca,</span> <span className="text-blue-600">Compara</span> y{" "}
+        <span className="text-green-600">Elige</span> la mejor opción para ti!
       </h1>
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="relative rounded-lg shadow-md transition-transform duration-300 transform hover:scale-101">
-          <Link href={`/shop?category=${encodeURIComponent("Tech")}`}>
+          <Link href="/shop?condition=Nuevo (0km)">
             <div className="overflow-hidden rounded-lg relative">
               <Image
                 src="/images/main/CategorySection/new.jpg"
@@ -33,7 +34,7 @@ export default function CategorySection() {
         </div>
 
         <div className="relative rounded-lg shadow-md transition-transform duration-300 transform hover:scale-101">
-          <Link href={`/shop?category=${encodeURIComponent("Fashion")}`}>
+          <Link href="/shop?condition=Usado">
             <div className="overflow-hidden rounded-lg relative">
               <Image
                 src="/images/main/CategorySection/trato.jpg"

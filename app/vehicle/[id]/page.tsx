@@ -22,6 +22,7 @@ interface VehiclePublication {
   color: string;
   engine_size: number;
   description: string;
+  condition: string;
   images: string[];
   status: string;
   created_at: string;
@@ -47,6 +48,7 @@ export default function VehicleDetailPage() {
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [showContactModal, setShowContactModal] = useState(false);
   const [isFavorite, setIsFavorite] = useState(false);
+  const [user, setUser] = useState<any>(null);
 
   useEffect(() => {
     if (vehicleId) {
@@ -56,6 +58,14 @@ export default function VehicleDetailPage() {
 
   const loadVehicleDetails = async () => {
     try {
+      // Verificar sesión del usuario
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
+        setUser(session.user);
+        // Verificar si está en favoritos
+        await checkIfFavorite(session.user.id);
+      }
+
       // Cargar vehículo
       const { data: vehicleData, error: vehicleError } = await supabase
         .from('vehicle_publications')
@@ -80,6 +90,59 @@ export default function VehicleDetailPage() {
       console.error('Error loading vehicle:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const checkIfFavorite = async (userId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('favorites')
+        .select('id')
+        .eq('user_id', userId)
+        .eq('vehicle_id', vehicleId)
+        .single();
+
+      if (error && error.code !== 'PGRST116') throw error;
+      setIsFavorite(!!data);
+    } catch (error: any) {
+      console.error('Error checking favorite:', error);
+    }
+  };
+
+  const toggleFavorite = async () => {
+    // Verificar si el usuario está autenticado
+    if (!user) {
+      alert('Debes iniciar sesión para agregar favoritos');
+      router.push('/login');
+      return;
+    }
+
+    try {
+      if (isFavorite) {
+        // Eliminar de favoritos
+        const { error } = await supabase
+          .from('favorites')
+          .delete()
+          .eq('user_id', user.id)
+          .eq('vehicle_id', vehicleId);
+
+        if (error) throw error;
+        setIsFavorite(false);
+      } else {
+        // Agregar a favoritos
+        const { error } = await supabase
+          .from('favorites')
+          .insert({
+            user_id: user.id,
+            vehicle_id: vehicleId
+          });
+
+        if (error) throw error;
+        setIsFavorite(true);
+      }
+    } catch (error: any) {
+      console.error('Error toggling favorite:', error);
+      alert('Error al actualizar favoritos');
     }
   };
 
@@ -252,18 +315,30 @@ export default function VehicleDetailPage() {
                   <h1 className="text-3xl font-bold text-gray-800 mb-2">
                     {vehicle.brand} {vehicle.model}
                   </h1>
-                  <p className="text-4xl font-bold text-indigo-600">
+                  <p className="text-4xl font-bold text-indigo-600 mb-2">
                     {formatPrice(vehicle.price)}
                   </p>
+                  {vehicle.condition && (
+                    <span className={`inline-block px-4 py-1 rounded-full text-sm font-semibold ${
+                      vehicle.condition === 'Nuevo (0km)' 
+                        ? 'bg-green-100 text-green-700' 
+                        : vehicle.condition === 'Seminuevo'
+                        ? 'bg-blue-100 text-blue-700'
+                        : 'bg-gray-100 text-gray-700'
+                    }`}>
+                      {vehicle.condition}
+                    </span>
+                  )}
                 </div>
                 <div className="flex gap-2">
                   <button
-                    onClick={() => setIsFavorite(!isFavorite)}
+                    onClick={toggleFavorite}
                     className={`p-3 rounded-full transition-colors ${
                       isFavorite
                         ? 'bg-red-100 text-red-600'
                         : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                     }`}
+                    title={isFavorite ? 'Quitar de favoritos' : 'Agregar a favoritos'}
                   >
                     <Heart className={`w-6 h-6 ${isFavorite ? 'fill-current' : ''}`} />
                   </button>

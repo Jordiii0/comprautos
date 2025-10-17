@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { supabase } from '@/lib/supabaseClient';
 import { 
   Car, Filter, Search, SlidersHorizontal, X, 
@@ -44,6 +44,7 @@ const SORT_OPTIONS = [
 
 export default function ShopPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [loading, setLoading] = useState(true);
   const [vehicles, setVehicles] = useState<VehiclePublication[]>([]);
   const [filteredVehicles, setFilteredVehicles] = useState<VehiclePublication[]>([]);
@@ -58,6 +59,7 @@ export default function ShopPage() {
     yearMax: '',
     priceMin: '',
     priceMax: '',
+    condition: searchParams?.get('condition') || '',
   });
 
   const [sortBy, setSortBy] = useState('default');
@@ -126,6 +128,11 @@ export default function ShopPage() {
       filtered = filtered.filter(v => v.price <= parseInt(filters.priceMax));
     }
 
+    // Filtro de condición/estado
+    if (filters.condition) {
+      filtered = filtered.filter(v => v.condition === filters.condition);
+    }
+
     // Ordenamiento
     switch (sortBy) {
       case 'price_desc':
@@ -162,8 +169,11 @@ export default function ShopPage() {
       yearMax: '',
       priceMin: '',
       priceMax: '',
+      condition: '',
     });
     setSortBy('default');
+    // Limpiar parámetros de la URL
+    router.push('/shop');
   };
 
   const formatPrice = (price: number) => {
@@ -177,7 +187,7 @@ export default function ShopPage() {
   const hasActiveFilters = () => {
     return filters.search || filters.brand || filters.model || 
            filters.yearMin || filters.yearMax || filters.priceMin || 
-           filters.priceMax || sortBy !== 'default';
+           filters.priceMax || filters.condition || sortBy !== 'default';
   };
 
   if (loading) {

@@ -61,7 +61,7 @@ export default function AboutUs() {
                 height={300}
               />
               <h3 className="text-xl font-semibold text-gray-900">Javier Veloso</h3>
-              <p className="text-gray-600">CEO & Founder</p>
+              <p className="text-gray-600">Ing. Informático</p>
             </div>
 
             <div className="text-center">
@@ -75,7 +75,7 @@ export default function AboutUs() {
               <h3 className="text-xl font-semibold text-gray-900">
                 Tomás Mariscal
               </h3>
-              <p className="text-gray-600">Head of Marketing</p>
+              <p className="text-gray-600">Ing. Informático</p>
             </div>
 
             <div className="text-center">
@@ -89,7 +89,7 @@ export default function AboutUs() {
               <h3 className="text-xl font-semibold text-gray-900">
                 Matías Pardo
               </h3>
-              <p className="text-gray-600">Lead Developer</p>
+              <p className="text-gray-600">Ing. Informático</p>
             </div>
 
             <div className="text-center">
@@ -101,7 +101,7 @@ export default function AboutUs() {
                 height={300}
               />
               <h3 className="text-xl font-semibold text-gray-900">Felipe Catalán</h3>
-              <p className="text-gray-600">Customer Support</p>
+              <p className="text-gray-600">Ing. Informático</p>
             </div>
           </div>
         </div>

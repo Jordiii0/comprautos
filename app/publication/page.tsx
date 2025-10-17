@@ -20,6 +20,7 @@ interface VehicleData {
   color: string;
   engine_size: string;
   description: string;
+  condition: string;
 }
 
 const BRANDS = [
@@ -30,6 +31,7 @@ const BRANDS = [
 
 const FUEL_TYPES = ['Gasolina', 'Diésel', 'Eléctrico', 'Híbrido'];
 const TRANSMISSIONS = ['Manual', 'Automática', 'Semi-automática'];
+const CONDITIONS = ['Nuevo (0km)', 'Seminuevo', 'Usado'];
 
 export default function PublicationPage() {
   const router = useRouter();
@@ -49,7 +51,8 @@ export default function PublicationPage() {
     fuel_type: '',
     color: '',
     engine_size: '',
-    description: ''
+    description: '',
+    condition: ''
   });
 
   const [images, setImages] = useState<File[]>([]);
@@ -102,7 +105,7 @@ export default function PublicationPage() {
     if (!vehicleData.price || !vehicleData.brand || !vehicleData.model || 
         !vehicleData.year || !vehicleData.mileage || !vehicleData.transmission ||
         !vehicleData.fuel_type || !vehicleData.color || !vehicleData.engine_size ||
-        !vehicleData.description) {
+        !vehicleData.description || !vehicleData.condition) {
       setError('Por favor completa todos los campos obligatorios');
       return;
     }
@@ -155,6 +158,7 @@ export default function PublicationPage() {
           color: vehicleData.color,
           engine_size: parseInt(vehicleData.engine_size),
           description: vehicleData.description,
+          condition: vehicleData.condition,
           images: imageUrls,
           status: 'active',
           created_at: new Date().toISOString()
@@ -292,16 +296,13 @@ export default function PublicationPage() {
                       <Car className="w-4 h-4 inline mr-1" />
                       Marca *
                     </label>
-                    <select
+                    <input
+                      type="text"
                       value={vehicleData.brand}
                       onChange={(e) => setVehicleData({ ...vehicleData, brand: e.target.value })}
                       className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                    >
-                      <option value="">Selecciona una marca</option>
-                      {BRANDS.map((brand) => (
-                        <option key={brand} value={brand}>{brand}</option>
-                      ))}
-                    </select>
+                      placeholder="Ej: Toyota, Chevrolet, Ford..."
+                    />
                   </div>
 
                   <div>
@@ -345,6 +346,23 @@ export default function PublicationPage() {
                       className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                       placeholder="50000"
                     />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      <CheckCircle className="w-4 h-4 inline mr-1" />
+                      Estado *
+                    </label>
+                    <select
+                      value={vehicleData.condition}
+                      onChange={(e) => setVehicleData({ ...vehicleData, condition: e.target.value })}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                    >
+                      <option value="">Selecciona el estado</option>
+                      {CONDITIONS.map((condition) => (
+                        <option key={condition} value={condition}>{condition}</option>
+                      ))}
+                    </select>
                   </div>
 
                   <div>

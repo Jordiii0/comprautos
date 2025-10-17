@@ -2,8 +2,6 @@
 
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Plus } from "lucide-react";
-import { List } from 'lucide-react';
 import { supabase } from "@/lib/supabaseClient";
 import {
   User,
@@ -16,6 +14,11 @@ import {
   MapPin,
   Save,
   Edit2,
+  Plus,
+  List,
+  Heart,
+  ChevronDown,
+  Menu,
 } from "lucide-react";
 
 interface UserProfile {
@@ -58,6 +61,7 @@ export default function ProfilePage() {
   const [saving, setSaving] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [successMessage, setSuccessMessage] = useState("");
+  const [showMenu, setShowMenu] = useState(false);
 
   const [profileData, setProfileData] = useState<ProfileData>({
     full_name: "",
@@ -231,7 +235,7 @@ export default function ProfilePage() {
                 <div className="w-32 h-32 bg-white rounded-full border-4 border-white shadow-lg flex items-center justify-center">
                   <UserCircle className="w-28 h-28 text-indigo-400" />
                 </div>
-                <div className="ml-6 mb-4">
+                <div className="ml-6 mb-1">
                   <h2 className="text-3xl font-bold text-gray-800">
                     {profileData.full_name || "Completa tu perfil"}
                   </h2>
@@ -241,31 +245,119 @@ export default function ProfilePage() {
                 </div>
               </div>
 
-              <div className="flex items-center gap-3 mb-4">
+              <div className="relative mb-1">
                 <button
-                  onClick={() => router.push("/publication")}
-                  className="flex items-center gap-2 bg-green-500 text-white px-4 py-2 rounded-lg hover:bg-green-600 transition-colors shadow-md"
+                  onClick={() => setShowMenu(!showMenu)}
+                  className="flex items-center gap-2 bg-gradient-to-r from-indigo-600 to-purple-600 text-white px-6 py-3 rounded-xl hover:shadow-lg transition-all font-semibold"
                 >
-                  <Plus className="w-4 h-4" />
-                  Publicar
+                  <Menu className="w-5 h-5" />
+                  Opciones
+                  <ChevronDown
+                    className={`w-4 h-4 transition-transform ${
+                      showMenu ? "rotate-180" : ""
+                    }`}
+                  />
                 </button>
 
-                <button
-                  onClick={() => router.push("/mypost")}
-                  className="flex items-center gap-2 bg-purple-500 text-white px-4 py-2 rounded-lg hover:bg-purple-600 transition-colors shadow-md"
-                >
-                  <List className="w-4 h-4" />
-                  Mis Publicaciones
-                </button>
+                {showMenu && (
+                  <>
+                    <div
+                      className="fixed inset-0 z-10"
+                      onClick={() => setShowMenu(false)}
+                    ></div>
 
-                {!isEditing && (
-                  <button
-                    onClick={() => setIsEditing(true)}
-                    className="flex items-center gap-2 bg-indigo-500 text-white px-4 py-2 rounded-lg hover:bg-indigo-600 transition-colors shadow-md"
-                  >
-                    <Edit2 className="w-4 h-4" />
-                    Editar
-                  </button>
+                    <div className="absolute top-full left-0 mt-2 w-64 bg-white rounded-xl shadow-2xl border border-gray-200 overflow-hidden z-20">
+                      <button
+                        onClick={() => {
+                          router.push("/publication");
+                          setShowMenu(false);
+                        }}
+                        className="w-full flex items-center gap-3 px-4 py-3 hover:bg-green-50 transition-colors text-left group"
+                      >
+                        <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center group-hover:bg-green-200 transition-colors">
+                          <Plus className="w-5 h-5 text-green-600" />
+                        </div>
+                        <div>
+                          <p className="font-semibold text-gray-800">
+                            Publicar
+                          </p>
+                          <p className="text-xs text-gray-500">
+                            Nuevo vehículo
+                          </p>
+                        </div>
+                      </button>
+
+                      <div className="border-t border-gray-100"></div>
+
+                      <button
+                        onClick={() => {
+                          router.push("/mypost");
+                          setShowMenu(false);
+                        }}
+                        className="w-full flex items-center gap-3 px-4 py-3 hover:bg-purple-50 transition-colors text-left group"
+                      >
+                        <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center group-hover:bg-purple-200 transition-colors">
+                          <List className="w-5 h-5 text-purple-600" />
+                        </div>
+                        <div>
+                          <p className="font-semibold text-gray-800">
+                            Mis Publicaciones
+                          </p>
+                          <p className="text-xs text-gray-500">
+                            Gestionar publicaciones
+                          </p>
+                        </div>
+                      </button>
+
+                      <div className="border-t border-gray-100"></div>
+
+                      <button
+                        onClick={() => {
+                          router.push("/favorites");
+                          setShowMenu(false);
+                        }}
+                        className="w-full flex items-center gap-3 px-4 py-3 hover:bg-pink-50 transition-colors text-left group"
+                      >
+                        <div className="w-10 h-10 bg-pink-100 rounded-lg flex items-center justify-center group-hover:bg-pink-200 transition-colors">
+                          <Heart className="w-5 h-5 text-pink-600" />
+                        </div>
+                        <div>
+                          <p className="font-semibold text-gray-800">
+                            Mis Favoritos
+                          </p>
+                          <p className="text-xs text-gray-500">
+                            Vehículos guardados
+                          </p>
+                        </div>
+                      </button>
+
+                      {!isEditing && (
+                        <>
+                          <div className="border-t border-gray-100"></div>
+
+                          <button
+                            onClick={() => {
+                              setIsEditing(true);
+                              setShowMenu(false);
+                            }}
+                            className="w-full flex items-center gap-3 px-4 py-3 hover:bg-indigo-50 transition-colors text-left group"
+                          >
+                            <div className="w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center group-hover:bg-indigo-200 transition-colors">
+                              <Edit2 className="w-5 h-5 text-indigo-600" />
+                            </div>
+                            <div>
+                              <p className="font-semibold text-gray-800">
+                                Editar Perfil
+                              </p>
+                              <p className="text-xs text-gray-500">
+                                Actualizar información
+                              </p>
+                            </div>
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  </>
                 )}
               </div>
             </div>

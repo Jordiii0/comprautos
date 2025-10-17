@@ -1,8 +1,8 @@
 {
+  "/icon.png/route": "app/icon.png/route.js",
+  "/comparativa/page": "app/comparativa/page.js",
+  "/login/page": "app/login/page.js",
   "/publication/page": "app/publication/page.js",
-  "/page": "app/page.js",
-  "/profile/page": "app/profile/page.js",
   "/vehicle/[id]/page": "app/vehicle/[id]/page.js",
-  "/shop/page": "app/shop/page.js",
-  "/login/page": "app/login/page.js"
+  "/page": "app/page.js"
 }

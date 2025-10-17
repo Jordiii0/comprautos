@@ -67,9 +67,9 @@ export default function Header() {
                 Sobre Nosotros
               </div>
             </Link>
-            <Link href="/contact">
+            <Link href="/comparativa">
               <div className="px-4 py-2 text-sm font-semibold text-gray-700 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all duration-200">
-                Contacto
+                Comparar
               </div>
             </Link>
           </nav>
@@ -77,11 +77,11 @@ export default function Header() {
           {/* Actions */}
           <div className="flex items-center space-x-2 lg:space-x-3">
             {/* Cart Button */}
-            <Link href="/cart">
+            <Link href="/favorites">
               <div className="relative group">
                 <div className="p-2 lg:px-4 lg:py-2 rounded-xl hover:bg-gray-100 transition-all duration-200 flex items-center space-x-2">
                   <span className="hidden lg:block text-sm font-semibold text-gray-700 group-hover:text-indigo-600 transition-colors">
-                    Carrito
+                    Favoritos
                   </span>
                 </div>
               </div>
