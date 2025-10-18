@@ -79,7 +79,7 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
     );
   };
 
-  return (
+  return (  
     <CartContext.Provider
       value={{ cart, addToCart, removeFromCart, clearCart, updateQuantity }}
     >

@@ -21,6 +21,7 @@ interface VehicleData {
   engine_size: string;
   description: string;
   condition: string;
+  vehicle_type: string;
 }
 
 const BRANDS = [
@@ -32,6 +33,7 @@ const BRANDS = [
 const FUEL_TYPES = ['Gasolina', 'Diésel', 'Eléctrico', 'Híbrido'];
 const TRANSMISSIONS = ['Manual', 'Automática', 'Semi-automática'];
 const CONDITIONS = ['Nuevo (0km)', 'Seminuevo', 'Usado'];
+const VEHICLE_TYPES = ['Hatchback', 'Sedán', 'Coupé', 'SUV', 'Deportivo', 'Pick Up'];
 
 export default function PublicationPage() {
   const router = useRouter();
@@ -52,7 +54,8 @@ export default function PublicationPage() {
     color: '',
     engine_size: '',
     description: '',
-    condition: ''
+    condition: '',
+    vehicle_type: ''
   });
 
   const [images, setImages] = useState<File[]>([]);
@@ -105,7 +108,7 @@ export default function PublicationPage() {
     if (!vehicleData.price || !vehicleData.brand || !vehicleData.model || 
         !vehicleData.year || !vehicleData.mileage || !vehicleData.transmission ||
         !vehicleData.fuel_type || !vehicleData.color || !vehicleData.engine_size ||
-        !vehicleData.description || !vehicleData.condition) {
+        !vehicleData.description || !vehicleData.condition || !vehicleData.vehicle_type) {
       setError('Por favor completa todos los campos obligatorios');
       return;
     }
@@ -159,6 +162,7 @@ export default function PublicationPage() {
           engine_size: parseInt(vehicleData.engine_size),
           description: vehicleData.description,
           condition: vehicleData.condition,
+          vehicle_type: vehicleData.vehicle_type,
           images: imageUrls,
           status: 'active',
           created_at: new Date().toISOString()
@@ -361,6 +365,23 @@ export default function PublicationPage() {
                       <option value="">Selecciona el estado</option>
                       {CONDITIONS.map((condition) => (
                         <option key={condition} value={condition}>{condition}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      <Car className="w-4 h-4 inline mr-1" />
+                      Tipo de Vehículo *
+                    </label>
+                    <select
+                      value={vehicleData.vehicle_type}
+                      onChange={(e) => setVehicleData({ ...vehicleData, vehicle_type: e.target.value })}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                    >
+                      <option value="">Selecciona el tipo</option>
+                      {VEHICLE_TYPES.map((type) => (
+                        <option key={type} value={type}>{type}</option>
                       ))}
                     </select>
                   </div>

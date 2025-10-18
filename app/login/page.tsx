@@ -3,14 +3,17 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabaseClient';
-import { Lock, Mail, AlertCircle, UserPlus } from 'lucide-react';
+import { Lock, Mail, AlertCircle, UserPlus, User, Building2, Briefcase } from 'lucide-react';
 
 export default function LoginPage() {
   const router = useRouter();
   const [isLogin, setIsLogin] = useState(true);
+  const [accountType, setAccountType] = useState<'personal' | 'business'>('personal');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [fullName, setFullName] = useState('');
+  const [position, setPosition] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
@@ -44,7 +47,13 @@ export default function LoginPage() {
       if (error) throw error;
 
       if (data.session) {
-        router.push('/profile');
+        // Redirigir según el tipo de cuenta
+        const accountType = data.user.user_metadata?.account_type;
+        if (accountType === 'business') {
+          router.push('/business-profile');
+        } else {
+          router.push('/profile');
+        }
       }
     } catch (error: any) {
       setError(error.message || 'Error al iniciar sesión');
@@ -58,8 +67,16 @@ export default function LoginPage() {
     setSuccessMessage('');
     setLoading(true);
 
+    // Validaciones comunes
     if (!email || !password || !confirmPassword) {
       setError('Por favor completa todos los campos');
+      setLoading(false);
+      return;
+    }
+
+    // Validaciones específicas para cuenta empresa
+    if (accountType === 'business' && (!fullName || !position)) {
+      setError('Por favor completa todos los campos de la empresa');
       setLoading(false);
       return;
     }
@@ -80,6 +97,13 @@ export default function LoginPage() {
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
+        options: {
+          data: {
+            account_type: accountType,
+            full_name: accountType === 'business' ? fullName : undefined,
+            position: accountType === 'business' ? position : undefined,
+          }
+        }
       });
 
       if (error) throw error;
@@ -117,6 +141,9 @@ export default function LoginPage() {
     setSuccessMessage('');
     setPassword('');
     setConfirmPassword('');
+    setFullName('');
+    setPosition('');
+    setAccountType('personal');
   };
 
   return (
@@ -138,7 +165,89 @@ export default function LoginPage() {
           </p>
         </div>
 
+        {/* Account Type Selection - Solo para registro */}
+        {!isLogin && (
+          <div className="mb-6">
+            <label className="block text-sm font-medium text-gray-700 mb-3">
+              Tipo de Cuenta
+            </label>
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                type="button"
+                onClick={() => setAccountType('personal')}
+                className={`flex flex-col items-center gap-2 p-4 rounded-lg border-2 transition-all ${
+                  accountType === 'personal'
+                    ? 'border-indigo-600 bg-indigo-50'
+                    : 'border-gray-200 hover:border-indigo-300'
+                }`}
+              >
+                <User className={`w-6 h-6 ${accountType === 'personal' ? 'text-indigo-600' : 'text-gray-400'}`} />
+                <span className={`text-sm font-semibold ${accountType === 'personal' ? 'text-indigo-600' : 'text-gray-700'}`}>
+                  Personal
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setAccountType('business')}
+                className={`flex flex-col items-center gap-2 p-4 rounded-lg border-2 transition-all ${
+                  accountType === 'business'
+                    ? 'border-indigo-600 bg-indigo-50'
+                    : 'border-gray-200 hover:border-indigo-300'
+                }`}
+              >
+                <Building2 className={`w-6 h-6 ${accountType === 'business' ? 'text-indigo-600' : 'text-gray-400'}`} />
+                <span className={`text-sm font-semibold ${accountType === 'business' ? 'text-indigo-600' : 'text-gray-700'}`}>
+                  Empresa
+                </span>
+              </button>
+            </div>
+          </div>
+        )}
+
         <div className="space-y-6">
+          {/* Campos específicos para cuenta empresa */}
+          {!isLogin && accountType === 'business' && (
+            <>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Nombre Completo
+                </label>
+                <div className="relative">
+                  <User className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+                  <input
+                    type="text"
+                    value={fullName}
+                    onChange={(e) => setFullName(e.target.value)}
+                    onKeyPress={handleKeyPress}
+                    className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                    placeholder="Juan Pérez"
+                    disabled={loading}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Cargo en la Empresa
+                </label>
+                <div className="relative">
+                  <Briefcase className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+                  <input
+                    type="text"
+                    value={position}
+                    onChange={(e) => setPosition(e.target.value)}
+                    onKeyPress={handleKeyPress}
+                    className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                    placeholder="Gerente de Ventas"
+                    disabled={loading}
+                  />
+                </div>
+              </div>
+            </>
+          )}
+
+          {/* Correo electrónico */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Correo Electrónico
@@ -157,6 +266,7 @@ export default function LoginPage() {
             </div>
           </div>
 
+          {/* Contraseña */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Contraseña
@@ -180,6 +290,7 @@ export default function LoginPage() {
             )}
           </div>
 
+          {/* Confirmar contraseña - Solo para registro */}
           {!isLogin && (
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -200,6 +311,7 @@ export default function LoginPage() {
             </div>
           )}
 
+          {/* Mensajes de error y éxito */}
           {error && (
             <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm flex items-center gap-2">
               <AlertCircle className="w-5 h-5 flex-shrink-0" />
@@ -213,6 +325,7 @@ export default function LoginPage() {
             </div>
           )}
 
+          {/* Botón principal */}
           <button
             onClick={handleSubmit}
             disabled={loading}
@@ -225,6 +338,7 @@ export default function LoginPage() {
             )}
           </button>
 
+          {/* Separador */}
           <div className="relative">
             <div className="absolute inset-0 flex items-center">
               <div className="w-full border-t border-gray-300"></div>
@@ -234,6 +348,7 @@ export default function LoginPage() {
             </div>
           </div>
 
+          {/* Switch entre login y registro */}
           <button
             onClick={switchMode}
             disabled={loading}

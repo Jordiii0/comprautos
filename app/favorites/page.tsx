@@ -140,7 +140,7 @@ export default function FavoritesPage() {
         {/* Header */}
         <div className="mb-8">
           <button
-            onClick={() => router.push('/profile')}
+            onClick={() => router.back()}
             className="flex items-center gap-2 text-gray-600 hover:text-gray-900 transition-colors mb-4"
           >
             <ArrowLeft className="w-5 h-5" />

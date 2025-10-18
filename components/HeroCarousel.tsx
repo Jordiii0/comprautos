@@ -14,12 +14,12 @@ const HeroCarousel: React.FC = () => {
   const slides: Slide[] = [
     {
       image: '/images/banner.jpg',
-      title: 'Donde el estilo se encuentra con la innovación',
+      title: 'Nuevos Vehiculos!',
       subtitle: 'Descubre un gran catalogo de vehículos.'
     },
     {
       image: '/images/banner2.jpg',
-      title: 'Elige la mejor opción para ti!',
+      title: 'Nuevos Vehiculos!',
       subtitle: 'Descubre un gran catalogo de vehículos.'
     },
     {
@@ -130,31 +130,6 @@ const HeroCarousel: React.FC = () => {
           />
         ))}
       </div>
-
-      <style jsx>{`
-        @keyframes fade-in {
-          from {
-            opacity: 0;
-            transform: translateY(20px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
-        }
-
-        .animate-fade-in {
-          animation: fade-in 0.8s ease-out;
-        }
-
-        .animate-fade-in-delay {
-          animation: fade-in 0.8s ease-out 0.2s both;
-        }
-
-        .animate-fade-in-delay-2 {
-          animation: fade-in 0.8s ease-out 0.4s both;
-        }
-      `}</style>
     </section>
   );
 };

@@ -2,11 +2,13 @@
 
 import Link from "next/link";
 import { useState, useEffect } from "react";
+import { supabase } from "@/lib/supabaseClient";
 import { ShoppingCart, User, Menu, X, ChevronDown } from "lucide-react";
 
 export default function Header() {
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
+  const [profileRoute, setProfileRoute] = useState("/profile");
 
   useEffect(() => {
     const handleScroll = () => {
@@ -14,6 +16,39 @@ export default function Header() {
     };
     window.addEventListener("scroll", handleScroll);
     return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
+
+  useEffect(() => {
+    const checkUserType = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (session?.user) {
+        const accountType = session.user.user_metadata?.account_type;
+        if (accountType === 'business') {
+          setProfileRoute("/business-profile");
+        } else {
+          setProfileRoute("/profile");
+        }
+      }
+    };
+
+    checkUserType();
+
+    // Escuchar cambios de autenticación
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (session?.user) {
+        const accountType = session.user.user_metadata?.account_type;
+        if (accountType === 'business') {
+          setProfileRoute("/business-profile");
+        } else {
+          setProfileRoute("/profile");
+        }
+      } else {
+        setProfileRoute("/profile");
+      }
+    });
+
+    return () => subscription.unsubscribe();
   }, []);
 
   return (
@@ -69,26 +104,26 @@ export default function Header() {
             </Link>
             <Link href="/comparativa">
               <div className="px-4 py-2 text-sm font-semibold text-gray-700 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all duration-200">
-                Comparar
+                Compara
               </div>
             </Link>
           </nav>
 
           {/* Actions */}
           <div className="flex items-center space-x-2 lg:space-x-3">
-            {/* Cart Button */}
-            <Link href="/favorites">
+            {/* Publish Button */}
+            <Link href="/publication">
               <div className="relative group">
                 <div className="p-2 lg:px-4 lg:py-2 rounded-xl hover:bg-gray-100 transition-all duration-200 flex items-center space-x-2">
                   <span className="hidden lg:block text-sm font-semibold text-gray-700 group-hover:text-indigo-600 transition-colors">
-                    Favoritos
+                    Vende tu Auto
                   </span>
                 </div>
               </div>
             </Link>
 
-            {/* Profile Button */}
-            <Link href="/profile">
+            {/* Profile Button - Desktop */}
+            <Link href={profileRoute}>
               <div className="hidden lg:flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-xl hover:shadow-lg hover:scale-105 transition-all duration-200 group">
                 <User className="w-5 h-5" />
                 <span className="text-sm font-semibold">Mi Perfil</span>
@@ -96,7 +131,7 @@ export default function Header() {
             </Link>
 
             {/* Mobile Profile Icon */}
-            <Link href="/profile" className="lg:hidden">
+            <Link href={profileRoute} className="lg:hidden">
               <div className="p-2 rounded-xl hover:bg-gray-100 transition-all">
                 <User className="w-5 h-5 text-gray-700" />
               </div>
@@ -133,15 +168,15 @@ export default function Header() {
                   <ChevronDown className="w-4 h-4 -rotate-90" />
                 </div>
               </Link>
-              <Link href="/contact" onClick={() => setIsMobileOpen(false)}>
+              <Link href="/comparativa" onClick={() => setIsMobileOpen(false)}>
                 <div className="flex items-center justify-between px-4 py-3 text-gray-700 hover:bg-indigo-50 hover:text-indigo-600 rounded-lg transition-all font-medium">
-                  Contacto
+                  Compara
                   <ChevronDown className="w-4 h-4 -rotate-90" />
                 </div>
               </Link>
-              
+
               <div className="pt-4 mt-4 border-t border-gray-100">
-                <Link href="/profile" onClick={() => setIsMobileOpen(false)}>
+                <Link href={profileRoute} onClick={() => setIsMobileOpen(false)}>
                   <div className="flex items-center space-x-3 px-4 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-lg hover:shadow-lg transition-all font-semibold">
                     <User className="w-5 h-5" />
                     <span>Mi Perfil</span>

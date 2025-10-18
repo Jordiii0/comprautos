@@ -27,6 +27,7 @@ interface VehiclePublication {
   status: string;
   created_at: string;
   user_id: string;
+  vehicle_type: string;
 }
 
 interface SellerProfile {
@@ -385,6 +386,14 @@ export default function VehicleDetailPage() {
                     <p className="text-xs text-gray-600">Combustible</p>
                     <p className="font-semibold text-gray-800">{vehicle.fuel_type}</p>
                   </div>
+                </div>
+
+                <div className="flex items-center gap-3 p-3 bg-orange-50 rounded-lg">
+                    <Car className='w-5 h-5 text-orange-600' />
+                    <div>
+                      <p className="text-xs text-gray-600">Tipo de Vehículo</p>
+                      <p className="font-semibold text-gray-800">{vehicle.vehicle_type}</p>
+                    </div>
                 </div>
 
                 <div className="flex items-center gap-3 p-3 bg-pink-50 rounded-lg">

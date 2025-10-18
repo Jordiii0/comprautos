@@ -8,6 +8,7 @@ import {
   Loader2, Calendar, Gauge, DollarSign, ArrowUpDown,
   ChevronDown, Eye, Fuel, Cog
 } from 'lucide-react';
+import { b } from 'framer-motion/client';
 
 interface VehiclePublication {
   id: string;
@@ -25,13 +26,11 @@ interface VehiclePublication {
   status: string;
   created_at: string;
   user_id: string;
+  vehicle_type: string;
 }
 
-const BRANDS = [
-  'Toyota', 'Honda', 'Ford', 'Chevrolet', 'Nissan', 'Mazda', 
-  'Hyundai', 'Kia', 'Volkswagen', 'BMW', 'Mercedes-Benz', 
-  'Audi', 'Peugeot', 'Renault', 'Suzuki', 'Mitsubishi', 'Subaru'
-];
+const VEHICLE_TYPES = ['Hatchback', 'Sedán', 'Coupé', 'SUV', 'Deportivo', 'Pick Up'];
+
 
 const SORT_OPTIONS = [
   { value: 'default', label: 'Por defecto (Recientes)' },
@@ -49,6 +48,7 @@ export default function ShopPage() {
   const [vehicles, setVehicles] = useState<VehiclePublication[]>([]);
   const [filteredVehicles, setFilteredVehicles] = useState<VehiclePublication[]>([]);
   const [showFilters, setShowFilters] = useState(false);
+  const [vehicleType, setVehicleType] = useState(searchParams?.get('vehicleType') || '');
 
   // Filtros
   const [filters, setFilters] = useState({
@@ -60,6 +60,7 @@ export default function ShopPage() {
     priceMin: '',
     priceMax: '',
     condition: searchParams?.get('condition') || '',
+    vehicleType: vehicleType,
   });
 
   const [sortBy, setSortBy] = useState('default');
@@ -103,7 +104,8 @@ export default function ShopPage() {
 
     // Filtro de marca
     if (filters.brand) {
-      filtered = filtered.filter(v => v.brand === filters.brand);
+      const brandLower = filters.brand.toLowerCase();
+      filtered = filtered.filter(v => v.brand.toLowerCase().includes(brandLower));
     }
 
     // Filtro de modelo
@@ -126,6 +128,11 @@ export default function ShopPage() {
     }
     if (filters.priceMax) {
       filtered = filtered.filter(v => v.price <= parseInt(filters.priceMax));
+    }
+
+    // Filtro de tipo de vehículo
+    if (filters.vehicleType) {
+      filtered = filtered.filter(v => v.vehicle_type === filters.vehicleType);
     }
 
     // Filtro de condición/estado
@@ -170,6 +177,7 @@ export default function ShopPage() {
       priceMin: '',
       priceMax: '',
       condition: '',
+      vehicleType: '',
     });
     setSortBy('default');
     // Limpiar parámetros de la URL
@@ -277,16 +285,13 @@ export default function ShopPage() {
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Marca
                   </label>
-                  <select
+                  <input
+                    type="text"
                     value={filters.brand}
                     onChange={(e) => setFilters({ ...filters, brand: e.target.value })}
+                    placeholder="Ej: Toyota"
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                  >
-                    <option value="">Todas las marcas</option>
-                    {BRANDS.map(brand => (
-                      <option key={brand} value={brand}>{brand}</option>
-                    ))}
-                  </select>
+                  />
                 </div>
 
                 {/* Model Filter */}
@@ -301,6 +306,23 @@ export default function ShopPage() {
                     placeholder="Ej: Corolla"
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                   />
+                </div>
+
+                {/* Vehicle Type Filter */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Tipo de Vehículo
+                  </label>
+                  <select
+                    value={filters.vehicleType}
+                    onChange={(e) => setFilters({ ...filters, vehicleType: e.target.value })}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                  >
+                    <option value="">Todos los tipos</option>
+                    {VEHICLE_TYPES.map(type => (
+                      <option key={type} value={type}>{type}</option>
+                    ))}
+                  </select>
                 </div>
 
                 {/* Year Range */}
