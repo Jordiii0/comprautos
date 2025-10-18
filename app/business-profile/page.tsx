@@ -100,7 +100,7 @@ export default function BusinessProfilePage() {
       }
 
       // Verificar que sea cuenta empresa
-      if (session.user.user_metadata?.account_type !== 'business') {
+      if (session.user.user_metadata?.account_type !== "business") {
         router.push("/profile");
         return;
       }
@@ -250,7 +250,9 @@ export default function BusinessProfilePage() {
         <div className="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
           <div className="flex items-center gap-3">
             <Building2 className="w-8 h-8 text-indigo-600" />
-            <h1 className="text-2xl font-bold text-indigo-600">Perfil Empresarial</h1>
+            <h1 className="text-2xl font-bold text-indigo-600">
+              Perfil Empresarial
+            </h1>
           </div>
           <button
             onClick={handleLogout}
@@ -274,7 +276,8 @@ export default function BusinessProfilePage() {
                 </div>
                 <div className="ml-6 mb-5">
                   <h2 className="text-3xl font-bold text-gray-800 text-white">
-                    {profileData.commercial_name || "Completa tu perfil empresarial"}
+                    {profileData.commercial_name ||
+                      "Completa tu perfil empresarial"}
                   </h2>
                   <p className="text-gray-600">
                     {user.user_metadata?.full_name || "Representante Legal"}
@@ -629,6 +632,52 @@ export default function BusinessProfilePage() {
                     </button>
                   </div>
                 )}
+              </div>
+              <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-lg p-6 border border-indigo-100">
+                <div className="flex items-center gap-3 mb-4">
+                  <Briefcase className="w-6 h-6 text-indigo-600" />
+                  <h3 className="text-lg font-semibold text-gray-800">
+                    Información del Representante
+                  </h3>
+                </div>
+
+                <div className="grid md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Nombre Completo
+                    </label>
+                    <div className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-700">
+                      {user.user_metadata?.full_name || "No especificado"}
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Cargo
+                    </label>
+                    <div className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-700 flex items-center gap-2">
+                      <Briefcase className="w-4 h-4 text-gray-500" />
+                      {user.user_metadata?.position || "No especificado"}
+                    </div>
+                  </div>
+
+                  <div className="md:col-span-2">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      <Mail className="w-4 h-4 inline mr-1" />
+                      Correo Electrónico de Acceso
+                    </label>
+                    <div className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-700">
+                      {user.email}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mt-4 bg-blue-50 border border-blue-200 rounded-lg p-4">
+                  <p className="text-sm text-blue-800">
+                    <strong>Nota:</strong> Esta información fue registrada al
+                    crear la cuenta. Para modificarla, contacta con soporte.
+                  </p>
+                </div>
               </div>
 
               <div className="bg-gradient-to-br from-purple-50 to-pink-50 rounded-lg p-6 border border-purple-100">

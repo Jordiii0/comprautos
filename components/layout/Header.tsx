@@ -3,12 +3,14 @@
 import Link from "next/link";
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabaseClient";
-import { ShoppingCart, User, Menu, X, ChevronDown } from "lucide-react";
+import { ShoppingCart, User, Menu, X, ChevronDown, LogIn, UserCircle } from "lucide-react";
 
 export default function Header() {
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const [profileRoute, setProfileRoute] = useState("/profile");
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [userInfo, setUserInfo] = useState<{ name?: string; accountType?: string } | null>(null);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -23,12 +25,22 @@ export default function Header() {
       const { data: { session } } = await supabase.auth.getSession();
       
       if (session?.user) {
+        setIsAuthenticated(true);
         const accountType = session.user.user_metadata?.account_type;
+        
+        setUserInfo({
+          name: session.user.user_metadata?.full_name || session.user.email?.split('@')[0],
+          accountType: accountType
+        });
+
         if (accountType === 'business') {
           setProfileRoute("/business-profile");
         } else {
           setProfileRoute("/profile");
         }
+      } else {
+        setIsAuthenticated(false);
+        setUserInfo(null);
       }
     };
 
@@ -37,13 +49,22 @@ export default function Header() {
     // Escuchar cambios de autenticación
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (session?.user) {
+        setIsAuthenticated(true);
         const accountType = session.user.user_metadata?.account_type;
+        
+        setUserInfo({
+          name: session.user.user_metadata?.full_name || session.user.email?.split('@')[0],
+          accountType: accountType
+        });
+
         if (accountType === 'business') {
           setProfileRoute("/business-profile");
         } else {
           setProfileRoute("/profile");
         }
       } else {
+        setIsAuthenticated(false);
+        setUserInfo(null);
         setProfileRoute("/profile");
       }
     });
@@ -122,18 +143,42 @@ export default function Header() {
               </div>
             </Link>
 
-            {/* Profile Button - Desktop */}
-            <Link href={profileRoute}>
-              <div className="hidden lg:flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-xl hover:shadow-lg hover:scale-105 transition-all duration-200 group">
-                <User className="w-5 h-5" />
-                <span className="text-sm font-semibold">Mi Perfil</span>
-              </div>
-            </Link>
+            {/* Profile/Login Button - Desktop */}
+            {isAuthenticated ? (
+              <Link href={profileRoute}>
+                <div className="hidden lg:flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-xl hover:shadow-lg hover:scale-105 transition-all duration-200 group relative">
+                  <div className="absolute -top-1 -right-1 w-3 h-3 bg-green-400 rounded-full border-2 border-white"></div>
+                  <UserCircle className="w-5 h-5" />
+                  <div className="flex flex-col">
+                    <span className="text-sm font-semibold leading-tight">
+                      {userInfo?.name || 'Mi Perfil'}
+                    </span>
+                    {userInfo?.accountType === 'business' && (
+                      <span className="text-[10px] opacity-90 leading-tight">Empresa</span>
+                    )}
+                  </div>
+                </div>
+              </Link>
+            ) : (
+              <Link href="/login">
+                <div className="hidden lg:flex items-center space-x-2 px-4 py-2 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 hover:scale-105 transition-all duration-200 group">
+                  <LogIn className="w-5 h-5" />
+                  <span className="text-sm font-semibold">Iniciar Sesión</span>
+                </div>
+              </Link>
+            )}
 
-            {/* Mobile Profile Icon */}
-            <Link href={profileRoute} className="lg:hidden">
-              <div className="p-2 rounded-xl hover:bg-gray-100 transition-all">
-                <User className="w-5 h-5 text-gray-700" />
+            {/* Mobile Profile/Login Icon */}
+            <Link href={isAuthenticated ? profileRoute : "/login"} className="lg:hidden">
+              <div className="relative p-2 rounded-xl hover:bg-gray-100 transition-all">
+                {isAuthenticated ? (
+                  <>
+                    <UserCircle className="w-5 h-5 text-indigo-600" />
+                    <div className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-green-400 rounded-full border border-white"></div>
+                  </>
+                ) : (
+                  <LogIn className="w-5 h-5 text-gray-700" />
+                )}
               </div>
             </Link>
 
@@ -176,12 +221,35 @@ export default function Header() {
               </Link>
 
               <div className="pt-4 mt-4 border-t border-gray-100">
-                <Link href={profileRoute} onClick={() => setIsMobileOpen(false)}>
-                  <div className="flex items-center space-x-3 px-4 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-lg hover:shadow-lg transition-all font-semibold">
-                    <User className="w-5 h-5" />
-                    <span>Mi Perfil</span>
-                  </div>
-                </Link>
+                {isAuthenticated ? (
+                  <Link href={profileRoute} onClick={() => setIsMobileOpen(false)}>
+                    <div className="flex items-center justify-between px-4 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-lg hover:shadow-lg transition-all font-semibold">
+                      <div className="flex items-center space-x-3">
+                        <div className="relative">
+                          <UserCircle className="w-5 h-5" />
+                          <div className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-green-400 rounded-full border border-white"></div>
+                        </div>
+                        <div className="flex flex-col items-start">
+                          <span>{userInfo?.name || 'Mi Perfil'}</span>
+                          {userInfo?.accountType === 'business' && (
+                            <span className="text-xs opacity-90">Cuenta Empresa</span>
+                          )}
+                        </div>
+                      </div>
+                      <ChevronDown className="w-4 h-4 -rotate-90" />
+                    </div>
+                  </Link>
+                ) : (
+                  <Link href="/login" onClick={() => setIsMobileOpen(false)}>
+                    <div className="flex items-center justify-between px-4 py-3 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-all font-semibold">
+                      <div className="flex items-center space-x-3">
+                        <LogIn className="w-5 h-5" />
+                        <span>Iniciar Sesión</span>
+                      </div>
+                      <ChevronDown className="w-4 h-4 -rotate-90" />
+                    </div>
+                  </Link>
+                )}
               </div>
             </nav>
           </div>

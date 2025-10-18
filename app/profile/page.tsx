@@ -235,8 +235,8 @@ export default function ProfilePage() {
                 <div className="w-32 h-32 bg-white rounded-full border-4 border-white shadow-lg flex items-center justify-center">
                   <UserCircle className="w-28 h-28 text-indigo-400" />
                 </div>
-                <div className="ml-6 mb-1">
-                  <h2 className="text-3xl font-bold text-gray-800">
+                <div className="ml-6 mb-10">
+                  <h2 className="text-3xl font-bold text-gray-800 text-white">
                     {profileData.full_name || "Completa tu perfil"}
                   </h2>
                   <p className="text-gray-600">

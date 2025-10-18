@@ -1,10 +1,8 @@
 {
   "/page": "app/page.js",
-  "/login/page": "app/login/page.js",
-  "/profile/page": "app/profile/page.js",
-  "/about/page": "app/about/page.js",
+  "/shop/page": "app/shop/page.js",
+  "/vehicle/[id]/page": "app/vehicle/[id]/page.js",
   "/comparativa/page": "app/comparativa/page.js",
-  "/mypost/page": "app/mypost/page.js",
-  "/publication/page": "app/publication/page.js",
-  "/favorites/page": "app/favorites/page.js"
+  "/login/page": "app/login/page.js",
+  "/_not-found/page": "app/_not-found/page.js"
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 
 interface Slide {
   image: string;
@@ -19,13 +20,13 @@ const HeroCarousel: React.FC = () => {
     },
     {
       image: '/images/banner2.jpg',
-      title: 'Nuevos Vehiculos!',
-      subtitle: 'Descubre un gran catalogo de vehículos.'
+      title: 'Ofertas Exclusivas!',
+      subtitle: 'Encuentra las mejores ofertas del mercado.'
     },
     {
       image: '/images/banner3.jpg',
-      title: 'Nuevos Vehiculos!',
-      subtitle: 'Descubre un gran catalogo de vehículos.'
+      title: 'Vende tu Auto!',
+      subtitle: 'Publica tu vehículo de forma rápida y sencilla.'
     }
   ];
 
@@ -56,7 +57,7 @@ const HeroCarousel: React.FC = () => {
         <div
           key={index}
           className={`absolute inset-0 transition-opacity duration-1000 ${
-            index === currentSlide ? 'opacity-100' : 'opacity-0'
+            index === currentSlide ? 'opacity-100 z-10' : 'opacity-0 z-0'
           }`}
         >
           <div
@@ -66,7 +67,7 @@ const HeroCarousel: React.FC = () => {
             <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-black/50 to-transparent"></div>
           </div>
 
-          <div className="relative container mx-auto px-6 h-full flex items-center">
+          <div className="relative container mx-auto px-6 h-full flex items-center z-20">
             <div className="max-w-3xl text-left text-white">
               <h2 className="text-4xl sm:text-6xl font-extrabold leading-tight animate-fade-in">
                 {slide.title}
@@ -78,15 +79,15 @@ const HeroCarousel: React.FC = () => {
               <div className="mt-8 flex flex-wrap gap-4 animate-fade-in-delay-2">
                 <a
                   href="/login"
-                  className="rounded-full bg-white/90 px-8 py-3 text-sm font-semibold text-gray-900 backdrop-blur-md hover:bg-white transition"
+                  className="inline-block rounded-full bg-white/90 px-8 py-3 text-sm font-semibold text-gray-900 backdrop-blur-md hover:bg-white hover:scale-105 transition-all shadow-lg"
                 >
                   Inicia Sesión
                 </a>
                 <a
                   href="/shop"
-                  className="rounded-full border border-white px-8 py-3 text-sm font-semibold text-white hover:bg-white hover:text-gray-900 transition"
+                  className="inline-block rounded-full border-2 border-white px-8 py-3 text-sm font-semibold text-white hover:bg-white hover:text-gray-900 transition-all"
                 >
-                  Descubre nuestros catálogo
+                  Descubre nuestro catálogo
                 </a>
               </div>
             </div>
@@ -94,39 +95,35 @@ const HeroCarousel: React.FC = () => {
         </div>
       ))}
 
-      {/* Navigation Arrows */}
+      {/* Navigation Arrows - Mejorados */}
       <button
         onClick={goToPrevious}
-        className="absolute left-4 top-1/2 -translate-y-1/2 z-10 bg-white/20 hover:bg-white/40 backdrop-blur-sm text-white p-3 rounded-full transition"
+        className="absolute left-4 lg:left-8 top-1/2 -translate-y-1/2 z-30 bg-white/10 hover:bg-white/30 backdrop-blur-md text-white p-3 lg:p-4 rounded-full transition-all hover:scale-110 focus:outline-none focus:ring-2 focus:ring-white/50 shadow-lg"
         aria-label="Previous slide"
       >
-        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-        </svg>
+        <ChevronLeft className="w-6 h-6 lg:w-8 lg:h-8" />
       </button>
 
       <button
         onClick={goToNext}
-        className="absolute right-4 top-1/2 -translate-y-1/2 z-10 bg-white/20 hover:bg-white/40 backdrop-blur-sm text-white p-3 rounded-full transition"
+        className="absolute right-4 lg:right-8 top-1/2 -translate-y-1/2 z-30 bg-white/10 hover:bg-white/30 backdrop-blur-md text-white p-3 lg:p-4 rounded-full transition-all hover:scale-110 focus:outline-none focus:ring-2 focus:ring-white/50 shadow-lg"
         aria-label="Next slide"
       >
-        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-        </svg>
+        <ChevronRight className="w-6 h-6 lg:w-8 lg:h-8" />
       </button>
 
-      {/* Dots Indicator */}
-      <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-10 flex gap-3">
+      {/* Dots Indicator - Mejorado */}
+      <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-30 flex gap-3 bg-black/20 backdrop-blur-sm px-4 py-2 rounded-full">
         {slides.map((_, index) => (
           <button
             key={index}
             onClick={() => goToSlide(index)}
-            className={`h-3 rounded-full transition-all ${
+            className={`h-3 rounded-full transition-all focus:outline-none ${
               index === currentSlide
-                ? 'w-8 bg-white'
-                : 'w-3 bg-white/50 hover:bg-white/75'
+                ? 'w-8 bg-white shadow-lg'
+                : 'w-3 bg-white/50 hover:bg-white/75 hover:scale-110'
             }`}
-            aria-label={`Go to slide ${index + 1}`}
+            aria-label={`Ir a diapositiva ${index + 1}`}
           />
         ))}
       </div>

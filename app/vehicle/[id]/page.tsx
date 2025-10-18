@@ -1,14 +1,32 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
-import { useRouter, useParams } from 'next/navigation';
-import { supabase } from '@/lib/supabaseClient';
-import { 
-  Car, ArrowLeft, Loader2, Calendar, Gauge, DollarSign,
-  Fuel, Cog, Palette, Wrench, User, Phone, Mail,
-  MapPin, Share2, Heart, AlertCircle, ChevronLeft, ChevronRight,
-  CheckCircle, X
-} from 'lucide-react';
+import React, { useState, useEffect } from "react";
+import { useRouter, useParams } from "next/navigation";
+import { supabase } from "@/lib/supabaseClient";
+import {
+  Car,
+  ArrowLeft,
+  Loader2,
+  Calendar,
+  Gauge,
+  DollarSign,
+  Fuel,
+  Cog,
+  Palette,
+  Wrench,
+  User,
+  Phone,
+  Mail,
+  MapPin,
+  Share2,
+  Heart,
+  AlertCircle,
+  ChevronLeft,
+  ChevronRight,
+  CheckCircle,
+  X,
+  Building2,
+} from "lucide-react";
 
 interface VehiclePublication {
   id: string;
@@ -36,6 +54,8 @@ interface SellerProfile {
   phone: string;
   region: string;
   city: string;
+  is_company?: boolean;
+  company_name?: string;
 }
 
 export default function VehicleDetailPage() {
@@ -57,10 +77,16 @@ export default function VehicleDetailPage() {
     }
   }, [vehicleId]);
 
+  const getSellerProfileRoute = () => {
+    return `/seller-profile/${vehicle?.user_id}`;
+  }
+
   const loadVehicleDetails = async () => {
     try {
       // Verificar sesión del usuario
-      const { data: { session } } = await supabase.auth.getSession();
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
       if (session) {
         setUser(session.user);
         // Verificar si está en favoritos
@@ -69,26 +95,56 @@ export default function VehicleDetailPage() {
 
       // Cargar vehículo
       const { data: vehicleData, error: vehicleError } = await supabase
-        .from('vehicle_publications')
-        .select('*')
-        .eq('id', vehicleId)
+        .from("vehicle_publications")
+        .select("*")
+        .eq("id", vehicleId)
         .single();
 
       if (vehicleError) throw vehicleError;
       setVehicle(vehicleData);
 
-      // Cargar perfil del vendedor
+      // Cargar perfil del vendedor (usuario o empresa)
+      // Primero intentar cargar como perfil de usuario
       const { data: profileData, error: profileError } = await supabase
-        .from('profiles')
-        .select('full_name, username, phone, region, city')
-        .eq('id', vehicleData.user_id)
+        .from("profiles")
+        .select("full_name, username, phone, region, city")
+        .eq("id", vehicleData.user_id)
         .single();
 
       if (!profileError && profileData) {
-        setSeller(profileData);
+        // Es un usuario normal
+        setSeller({
+          ...profileData,
+          is_company: false
+        });
+      } else {
+        // Si no es un usuario, intentar cargar como empresa
+        const { data: businessData, error: businessError } = await supabase
+          .from("business_profiles")
+          .select("commercial_name, phone, region, city")
+          .eq("id", vehicleData.user_id)
+          .single();
+
+        if (!businessError && businessData) {
+          // Es una empresa - adaptamos los datos al formato SellerProfile
+          setSeller({
+            full_name: businessData.commercial_name,
+            username: businessData.commercial_name.toLowerCase().replace(/\s+/g, '_'),
+            phone: businessData.phone,
+            region: businessData.region,
+            city: businessData.city,
+            is_company: true, // Lo establecemos aquí, no viene de la BD
+            company_name: businessData.commercial_name,
+          });
+        } else if (businessError) {
+          // Debug: Ver el error exacto
+          console.error("Error al cargar business_profile:", businessError);
+          console.log("Código de error:", businessError.code);
+          console.log("Mensaje:", businessError.message);
+        }
       }
     } catch (error: any) {
-      console.error('Error loading vehicle:', error);
+      console.error("Error loading vehicle:", error);
     } finally {
       setLoading(false);
     }
@@ -97,24 +153,24 @@ export default function VehicleDetailPage() {
   const checkIfFavorite = async (userId: string) => {
     try {
       const { data, error } = await supabase
-        .from('favorites')
-        .select('id')
-        .eq('user_id', userId)
-        .eq('vehicle_id', vehicleId)
+        .from("favorites")
+        .select("id")
+        .eq("user_id", userId)
+        .eq("vehicle_id", vehicleId)
         .single();
 
-      if (error && error.code !== 'PGRST116') throw error;
+      if (error && error.code !== "PGRST116") throw error;
       setIsFavorite(!!data);
     } catch (error: any) {
-      console.error('Error checking favorite:', error);
+      console.error("Error checking favorite:", error);
     }
   };
 
   const toggleFavorite = async () => {
     // Verificar si el usuario está autenticado
     if (!user) {
-      alert('Debes iniciar sesión para agregar favoritos');
-      router.push('/login');
+      alert("Debes iniciar sesión para agregar favoritos");
+      router.push("/login");
       return;
     }
 
@@ -122,50 +178,48 @@ export default function VehicleDetailPage() {
       if (isFavorite) {
         // Eliminar de favoritos
         const { error } = await supabase
-          .from('favorites')
+          .from("favorites")
           .delete()
-          .eq('user_id', user.id)
-          .eq('vehicle_id', vehicleId);
+          .eq("user_id", user.id)
+          .eq("vehicle_id", vehicleId);
 
         if (error) throw error;
         setIsFavorite(false);
       } else {
         // Agregar a favoritos
-        const { error } = await supabase
-          .from('favorites')
-          .insert({
-            user_id: user.id,
-            vehicle_id: vehicleId
-          });
+        const { error } = await supabase.from("favorites").insert({
+          user_id: user.id,
+          vehicle_id: vehicleId,
+        });
 
         if (error) throw error;
         setIsFavorite(true);
       }
     } catch (error: any) {
-      console.error('Error toggling favorite:', error);
-      alert('Error al actualizar favoritos');
+      console.error("Error toggling favorite:", error);
+      alert("Error al actualizar favoritos");
     }
   };
 
   const formatPrice = (price: number) => {
-    return new Intl.NumberFormat('es-CL', {
-      style: 'currency',
-      currency: 'CLP',
-      minimumFractionDigits: 0
+    return new Intl.NumberFormat("es-CL", {
+      style: "currency",
+      currency: "CLP",
+      minimumFractionDigits: 0,
     }).format(price);
   };
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('es-ES', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric'
+    return new Date(dateString).toLocaleDateString("es-ES", {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
     });
   };
 
   const nextImage = () => {
     if (vehicle && vehicle.images.length > 0) {
-      setCurrentImageIndex((prev) => 
+      setCurrentImageIndex((prev) =>
         prev === vehicle.images.length - 1 ? 0 : prev + 1
       );
     }
@@ -173,7 +227,7 @@ export default function VehicleDetailPage() {
 
   const prevImage = () => {
     if (vehicle && vehicle.images.length > 0) {
-      setCurrentImageIndex((prev) => 
+      setCurrentImageIndex((prev) =>
         prev === 0 ? vehicle.images.length - 1 : prev - 1
       );
     }
@@ -185,15 +239,15 @@ export default function VehicleDetailPage() {
         await navigator.share({
           title: `${vehicle?.brand} ${vehicle?.model}`,
           text: `Mira este ${vehicle?.brand} ${vehicle?.model} ${vehicle?.year}`,
-          url: window.location.href
+          url: window.location.href,
         });
       } catch (error) {
-        console.log('Error sharing:', error);
+        console.log("Error sharing:", error);
       }
     } else {
       // Fallback: copiar al portapapeles
       navigator.clipboard.writeText(window.location.href);
-      alert('Enlace copiado al portapapeles');
+      alert("Enlace copiado al portapapeles");
     }
   };
 
@@ -220,7 +274,7 @@ export default function VehicleDetailPage() {
             El vehículo que buscas no existe o ha sido eliminado
           </p>
           <button
-            onClick={() => router.push('/shop')}
+            onClick={() => router.push("/shop")}
             className="bg-indigo-600 text-white px-6 py-3 rounded-lg hover:bg-indigo-700 transition-colors font-semibold"
           >
             Volver a la tienda
@@ -255,7 +309,7 @@ export default function VehicleDetailPage() {
                       alt={`${vehicle.brand} ${vehicle.model}`}
                       className="w-full h-full object-cover"
                     />
-                    
+
                     {vehicle.images.length > 1 && (
                       <>
                         <button
@@ -288,8 +342,8 @@ export default function VehicleDetailPage() {
                           onClick={() => setCurrentImageIndex(index)}
                           className={`flex-shrink-0 w-20 h-20 rounded-lg overflow-hidden border-2 transition-all ${
                             index === currentImageIndex
-                              ? 'border-indigo-600 scale-105'
-                              : 'border-gray-200 hover:border-indigo-400'
+                              ? "border-indigo-600 scale-105"
+                              : "border-gray-200 hover:border-indigo-400"
                           }`}
                         >
                           <img
@@ -320,13 +374,15 @@ export default function VehicleDetailPage() {
                     {formatPrice(vehicle.price)}
                   </p>
                   {vehicle.condition && (
-                    <span className={`inline-block px-4 py-1 rounded-full text-sm font-semibold ${
-                      vehicle.condition === 'Nuevo (0km)' 
-                        ? 'bg-green-100 text-green-700' 
-                        : vehicle.condition === 'Seminuevo'
-                        ? 'bg-blue-100 text-blue-700'
-                        : 'bg-gray-100 text-gray-700'
-                    }`}>
+                    <span
+                      className={`inline-block px-4 py-1 rounded-full text-sm font-semibold ${
+                        vehicle.condition === "Nuevo (0km)"
+                          ? "bg-green-100 text-green-700"
+                          : vehicle.condition === "Seminuevo"
+                          ? "bg-blue-100 text-blue-700"
+                          : "bg-gray-100 text-gray-700"
+                      }`}
+                    >
                       {vehicle.condition}
                     </span>
                   )}
@@ -336,12 +392,16 @@ export default function VehicleDetailPage() {
                     onClick={toggleFavorite}
                     className={`p-3 rounded-full transition-colors ${
                       isFavorite
-                        ? 'bg-red-100 text-red-600'
-                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                        ? "bg-red-100 text-red-600"
+                        : "bg-gray-100 text-gray-600 hover:bg-gray-200"
                     }`}
-                    title={isFavorite ? 'Quitar de favoritos' : 'Agregar a favoritos'}
+                    title={
+                      isFavorite ? "Quitar de favoritos" : "Agregar a favoritos"
+                    }
                   >
-                    <Heart className={`w-6 h-6 ${isFavorite ? 'fill-current' : ''}`} />
+                    <Heart
+                      className={`w-6 h-6 ${isFavorite ? "fill-current" : ""}`}
+                    />
                   </button>
                   <button
                     onClick={handleShare}
@@ -358,7 +418,9 @@ export default function VehicleDetailPage() {
                   <Calendar className="w-5 h-5 text-indigo-600" />
                   <div>
                     <p className="text-xs text-gray-600">Año</p>
-                    <p className="font-semibold text-gray-800">{vehicle.year}</p>
+                    <p className="font-semibold text-gray-800">
+                      {vehicle.year}
+                    </p>
                   </div>
                 </div>
 
@@ -376,7 +438,9 @@ export default function VehicleDetailPage() {
                   <Cog className="w-5 h-5 text-green-600" />
                   <div>
                     <p className="text-xs text-gray-600">Transmisión</p>
-                    <p className="font-semibold text-gray-800">{vehicle.transmission}</p>
+                    <p className="font-semibold text-gray-800">
+                      {vehicle.transmission}
+                    </p>
                   </div>
                 </div>
 
@@ -384,23 +448,29 @@ export default function VehicleDetailPage() {
                   <Fuel className="w-5 h-5 text-yellow-600" />
                   <div>
                     <p className="text-xs text-gray-600">Combustible</p>
-                    <p className="font-semibold text-gray-800">{vehicle.fuel_type}</p>
+                    <p className="font-semibold text-gray-800">
+                      {vehicle.fuel_type}
+                    </p>
                   </div>
                 </div>
 
                 <div className="flex items-center gap-3 p-3 bg-orange-50 rounded-lg">
-                    <Car className='w-5 h-5 text-orange-600' />
-                    <div>
-                      <p className="text-xs text-gray-600">Tipo de Vehículo</p>
-                      <p className="font-semibold text-gray-800">{vehicle.vehicle_type}</p>
-                    </div>
+                  <Car className="w-5 h-5 text-orange-600" />
+                  <div>
+                    <p className="text-xs text-gray-600">Tipo de Vehículo</p>
+                    <p className="font-semibold text-gray-800">
+                      {vehicle.vehicle_type}
+                    </p>
+                  </div>
                 </div>
 
                 <div className="flex items-center gap-3 p-3 bg-pink-50 rounded-lg">
                   <Palette className="w-5 h-5 text-pink-600" />
                   <div>
                     <p className="text-xs text-gray-600">Color</p>
-                    <p className="font-semibold text-gray-800">{vehicle.color}</p>
+                    <p className="font-semibold text-gray-800">
+                      {vehicle.color}
+                    </p>
                   </div>
                 </div>
 
@@ -408,14 +478,18 @@ export default function VehicleDetailPage() {
                   <Wrench className="w-5 h-5 text-blue-600" />
                   <div>
                     <p className="text-xs text-gray-600">Motor</p>
-                    <p className="font-semibold text-gray-800">{vehicle.engine_size} cc</p>
+                    <p className="font-semibold text-gray-800">
+                      {vehicle.engine_size} cc
+                    </p>
                   </div>
                 </div>
               </div>
 
               {/* Description */}
               <div className="border-t pt-6">
-                <h3 className="text-xl font-bold text-gray-800 mb-3">Descripción</h3>
+                <h3 className="text-xl font-bold text-gray-800 mb-3">
+                  Descripción
+                </h3>
                 <p className="text-gray-700 whitespace-pre-line leading-relaxed">
                   {vehicle.description}
                 </p>
@@ -432,17 +506,39 @@ export default function VehicleDetailPage() {
           <div className="lg:col-span-1">
             <div className="bg-white rounded-2xl shadow-xl p-6 sticky top-24">
               <h3 className="text-xl font-bold text-gray-800 mb-4">
-                Información del Vendedor
+                Información del {seller?.is_company ? "Vendedor" : "Vendedor"}
               </h3>
 
               {seller ? (
                 <div className="space-y-4">
+                  {/* Badge de tipo de vendedor */}
+                  {seller.is_company && (
+                    <div className="flex items-center justify-center gap-2 bg-gradient-to-r from-indigo-100 to-purple-100 p-2 rounded-lg">
+                      <Building2 className="w-5 h-5 text-indigo-600" />
+                      <span className="text-sm font-semibold text-indigo-700">
+                        Empresa Verificada
+                      </span>
+                    </div>
+                  )}
+
                   <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
-                    <User className="w-5 h-5 text-gray-600" />
+                    {seller.is_company ? (
+                      <Building2 className="w-5 h-5 text-gray-600" />
+                    ) : (
+                      <User className="w-5 h-5 text-gray-600" />
+                    )}
                     <div>
-                      <p className="text-xs text-gray-600">Nombre</p>
-                      <p className="font-semibold text-gray-800">{seller.full_name}</p>
-                      <p className="text-sm text-gray-500">@{seller.username}</p>
+                      <p className="text-xs text-gray-600">
+                        {seller.is_company ? "Empresa" : "Nombre"}
+                      </p>
+                      <p className="font-semibold text-gray-800">
+                        {seller.full_name}
+                      </p>
+                      {!seller.is_company && (
+                        <p className="text-sm text-gray-500">
+                          @{seller.username}
+                        </p>
+                      )}
                     </div>
                   </div>
 
@@ -458,21 +554,38 @@ export default function VehicleDetailPage() {
                     </div>
                   )}
 
+                  {/* Botón para ver perfil */}
+                  <button
+                    onClick={() =>
+                      router.push(`/seller-profile/${vehicle.user_id}`)
+                    }
+                    className="w-full flex items-center justify-center gap-2 bg-gray-100 text-gray-800 py-3 rounded-xl hover:bg-gray-200 transition-all font-semibold border border-gray-300"
+                  >
+                    {seller.is_company ? (
+                      <Building2 className="w-5 h-5" />
+                    ) : (
+                      <User className="w-5 h-5" />
+                    )}
+                    Ver Perfil del {seller.is_company ? "Empresa" : "Vendedor"}
+                  </button>
+
                   <button
                     onClick={() => setShowContactModal(true)}
                     className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-indigo-600 to-purple-600 text-white py-4 rounded-xl hover:shadow-lg transition-all font-bold text-lg"
                   >
                     <Phone className="w-5 h-5" />
-                    Contactar Vendedor
+                    Contactar {seller.is_company ? "Empresa" : "Vendedor"}
                   </button>
 
                   <div className="text-center text-xs text-gray-500">
                     <CheckCircle className="w-4 h-4 inline mr-1 text-green-500" />
-                    Vendedor verificado
+                    {seller.is_company ? "Empresa verificada" : "Vendedor verificado"}
                   </div>
                 </div>
               ) : (
-                <p className="text-gray-600">Cargando información del vendedor...</p>
+                <p className="text-gray-600">
+                  Cargando información del vendedor...
+                </p>
               )}
             </div>
           </div>
@@ -484,7 +597,7 @@ export default function VehicleDetailPage() {
             <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-6">
               <div className="flex justify-between items-center mb-4">
                 <h3 className="text-2xl font-bold text-gray-800">
-                  Contactar Vendedor
+                  Contactar {seller.is_company ? "Empresa" : "Vendedor"}
                 </h3>
                 <button
                   onClick={() => setShowContactModal(false)}
@@ -497,10 +610,21 @@ export default function VehicleDetailPage() {
               <div className="space-y-4">
                 <div className="p-4 bg-indigo-50 rounded-lg">
                   <div className="flex items-center gap-3 mb-2">
-                    <User className="w-5 h-5 text-indigo-600" />
-                    <p className="font-semibold text-gray-800">{seller.full_name}</p>
+                    {seller.is_company ? (
+                      <Building2 className="w-5 h-5 text-indigo-600" />
+                    ) : (
+                      <User className="w-5 h-5 text-indigo-600" />
+                    )}
+                    <p className="font-semibold text-gray-800">
+                      {seller.full_name}
+                    </p>
                   </div>
-                  <p className="text-sm text-gray-600">@{seller.username}</p>
+                  {!seller.is_company && (
+                    <p className="text-sm text-gray-600">@{seller.username}</p>
+                  )}
+                  {seller.is_company && (
+                    <p className="text-sm text-gray-600">Empresa Verificada</p>
+                  )}
                 </div>
 
                 {seller.phone && (
@@ -511,13 +635,20 @@ export default function VehicleDetailPage() {
                     <Phone className="w-5 h-5 text-green-600" />
                     <div>
                       <p className="text-xs text-gray-600">Teléfono</p>
-                      <p className="font-semibold text-gray-800">{seller.phone}</p>
+                      <p className="font-semibold text-gray-800">
+                        {seller.phone}
+                      </p>
                     </div>
                   </a>
                 )}
 
                 <a
-                  href={`https://wa.me/${seller.phone?.replace(/\+/g, '')}?text=Hola, me interesa tu ${vehicle.brand} ${vehicle.model} ${vehicle.year}`}
+                  href={`https://wa.me/${seller.phone?.replace(
+                    /\+/g,
+                    ""
+                  )}?text=Hola, me interesa tu ${vehicle.brand} ${
+                    vehicle.model
+                  } ${vehicle.year}`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="w-full flex items-center justify-center gap-2 bg-green-500 text-white py-3 rounded-lg hover:bg-green-600 transition-colors font-semibold"
@@ -527,7 +658,9 @@ export default function VehicleDetailPage() {
                 </a>
 
                 <p className="text-xs text-center text-gray-500">
-                  Al contactar al vendedor, asegúrate de verificar la información del vehículo antes de realizar cualquier transacción.
+                  Al contactar al {seller.is_company ? "empresa" : "vendedor"}, asegúrate de verificar la
+                  información del vehículo antes de realizar cualquier
+                  transacción.
                 </p>
               </div>
             </div>
