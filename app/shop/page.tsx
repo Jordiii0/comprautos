@@ -22,6 +22,7 @@ interface VehiclePublication {
   color: string;
   engine_size: number;
   description: string;
+  condition: string;
   images: string[];
   status: string;
   created_at: string;
@@ -59,7 +60,7 @@ export default function ShopPage() {
     yearMax: '',
     priceMin: '',
     priceMax: '',
-    condition: searchParams?.get('condition') || '',
+    condition: searchParams?.getAll('condition') || [],
     vehicleType: vehicleType,
   });
 
@@ -136,8 +137,8 @@ export default function ShopPage() {
     }
 
     // Filtro de condición/estado
-    if (filters.condition) {
-      filtered = filtered.filter(v => v.condition === filters.condition);
+    if (filters.condition.length > 0) {
+      filtered = filtered.filter(v => filters.condition.includes(v.condition));
     }
 
     // Ordenamiento
@@ -176,7 +177,7 @@ export default function ShopPage() {
       yearMax: '',
       priceMin: '',
       priceMax: '',
-      condition: '',
+      condition: [],
       vehicleType: '',
     });
     setSortBy('default');
