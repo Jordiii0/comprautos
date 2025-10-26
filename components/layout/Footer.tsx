@@ -94,7 +94,7 @@ export default function Footer() {
         </div>
         <div className="mx-4 px-4 py-6 bg-gray-700 md:flex md:items-center md:justify-between rounded-lg">
           <span className="text-sm text-gray-300 sm:text-center">
-            © 2025 MY APP™. All Rights Reserved.
+            © 2025 carNETwork™. Todos los derechos reservados.
           </span>
           <div className="flex mt-4 sm:justify-center md:mt-0 space-x-5 rtl:space-x-reverse">
             <a href="#" className="text-gray-400 hover:text-white">

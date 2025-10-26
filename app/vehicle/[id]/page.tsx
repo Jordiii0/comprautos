@@ -167,39 +167,45 @@ export default function VehicleDetailPage() {
   };
 
   const toggleFavorite = async () => {
-    // Verificar si el usuario está autenticado
-    if (!user) {
-      alert("Debes iniciar sesión para agregar favoritos");
-      router.push("/login");
-      return;
-    }
+  if (!user) {
+    alert("Debes iniciar sesión para agregar favoritos");
+    router.push("/login");
+    return;
+  }
 
-    try {
-      if (isFavorite) {
-        // Eliminar de favoritos
-        const { error } = await supabase
-          .from("favorites")
-          .delete()
-          .eq("user_id", user.id)
-          .eq("vehicle_id", vehicleId);
+  try {
+    if (isFavorite) {
+      // Eliminar favorito
+      const { error: deleteError } = await supabase
+        .from("favorites")
+        .delete()
+        .eq("user_id", user.id)
+        .eq("vehicle_id", vehicleId);
 
-        if (error) throw error;
-        setIsFavorite(false);
-      } else {
-        // Agregar a favoritos
-        const { error } = await supabase.from("favorites").insert({
+      if (deleteError) throw deleteError;
+      setIsFavorite(false);
+    } else {
+      // Agregar favorito con SELECT para obtener el FK
+      const { data: insertData, error: insertError } = await supabase
+        .from("favorites")
+        .insert({
           user_id: user.id,
           vehicle_id: vehicleId,
-        });
+        })
+        .select(`*, fk_vehicle(*)`)
+        .single();
 
-        if (error) throw error;
-        setIsFavorite(true);
-      }
-    } catch (error: any) {
-      console.error("Error toggling favorite:", error);
-      alert("Error al actualizar favoritos");
+      if (insertError) throw insertError;
+
+      setIsFavorite(true);
+      console.log("Favorito agregado:", insertData);
     }
-  };
+  } catch (error: any) {
+    console.error("Error toggling favorite:", error);
+    alert(`Error al actualizar favoritos: ${error.message || JSON.stringify(error)}`);
+  }
+};
+
 
   const formatPrice = (price: number) => {
     return new Intl.NumberFormat("es-CL", {

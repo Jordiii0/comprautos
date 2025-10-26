@@ -27,6 +27,7 @@ interface VehiclePublication {
 }
 
 export default function ComparePage() {
+  const conditions = ["Nuevo (0km)", "Usado", "Seminuevo"];
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [vehicles, setVehicles] = useState<VehiclePublication[]>([]);
@@ -153,56 +154,59 @@ export default function ComparePage() {
   };
 
   const getHighlightClass = (attr: string, index: number) => {
-    const values = selectedVehicles.map(v => {
+  const values = selectedVehicles
+    .map(v => {
       if (!v) return null;
       switch (attr) {
         case 'price':
-          return v.price;
+          return Number(v.price);
         case 'year':
-          return v.year;
+          return Number(v.year);
         case 'mileage':
-          return v.mileage;
+          return Number(v.mileage);
         case 'engine_size':
-          return v.engine_size;
+          return Number(v.engine_size);
         default:
           return null;
       }
-    }).filter(v => v !== null);
+    })
+    .filter(v => v !== null);
 
-    if (values.length < 2) return '';
+  if (values.length < 2) return '';
 
-    const currentValue = selectedVehicles[index];
-    if (!currentValue) return '';
+  const currentValue = selectedVehicles[index];
+  if (!currentValue) return '';
 
-    let current: number;
-    switch (attr) {
-      case 'price':
-        current = currentValue.price;
-        break;
-      case 'year':
-        current = currentValue.year;
-        break;
-      case 'mileage':
-        current = currentValue.mileage;
-        break;
-      case 'engine_size':
-        current = currentValue.engine_size;
-        break;
-      default:
-        return '';
-    }
+  let current: number;
+  switch (attr) {
+    case 'price':
+      current = Number(currentValue.price);
+      break;
+    case 'year':
+      current = Number(currentValue.year);
+      break;
+    case 'mileage':
+      current = Number(currentValue.mileage);
+      break;
+    case 'engine_size':
+      current = Number(currentValue.engine_size);
+      break;
+    default:
+      return '';
+  }
 
-    const min = Math.min(...values as number[]);
-    const max = Math.max(...values as number[]);
+  const min = Math.min(...(values as number[]));
+  const max = Math.max(...(values as number[]));
 
-    if (attr === 'price' || attr === 'mileage') {
-      return current === min ? 'bg-green-50 border-green-300' : '';
-    } else if (attr === 'year' || attr === 'engine_size') {
-      return current === max ? 'bg-green-50 border-green-300' : '';
-    }
+  if (attr === 'price' || attr === 'mileage') {
+    return current === min ? 'bg-green-50 border-green-300' : '';
+  } else if (attr === 'year' || attr === 'engine_size') {
+    return current === max ? 'bg-green-50 border-green-300' : '';
+  }
 
-    return '';
-  };
+  return '';
+};
+
 
   if (loading) {
     return (
@@ -342,9 +346,9 @@ export default function ComparePage() {
                       <td key={index} className="px-6 py-4 text-center">
                         {vehicle ? (
                           <span className={`inline-block px-3 py-1 rounded-full text-sm font-semibold ${
-                            vehicle.condition === 'Nuevo (0km)' 
+                            vehicle.condition === conditions[0] 
                               ? 'bg-green-100 text-green-700' 
-                              : vehicle.condition === 'Seminuevo'
+                              : vehicle.condition === conditions[1] || vehicle.condition === conditions[2]
                               ? 'bg-blue-100 text-blue-700'
                               : 'bg-gray-100 text-gray-700'
                           }`}>

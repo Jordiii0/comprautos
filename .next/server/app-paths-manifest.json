@@ -1,5 +1,9 @@
 {
+  "/icon.png/route": "app/icon.png/route.js",
+  "/login/page": "app/login/page.js",
+  "/profile/page": "app/profile/page.js",
   "/page": "app/page.js",
   "/shop/page": "app/shop/page.js",
-  "/vehicle/[id]/page": "app/vehicle/[id]/page.js"
+  "/vehicle/[id]/page": "app/vehicle/[id]/page.js",
+  "/favorites/page": "app/favorites/page.js"
 }

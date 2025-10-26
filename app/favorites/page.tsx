@@ -59,33 +59,35 @@ export default function FavoritesPage() {
   }, [router]);
 
   const loadFavorites = async (userId: string) => {
-    try {
-      const { data, error } = await supabase
-        .from('favorites')
-        .select(`
-          id,
-          vehicle_id,
-          created_at,
-          vehicle_publications (*)
-        `)
-        .eq('user_id', userId)
-        .order('created_at', { ascending: false });
+  try {
+    const { data, error } = await supabase
+      .from('favorites')
+      .select(`
+        id,
+        vehicle_id,
+        created_at,
+        fk_vehicle (*)
+      `)
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false });
 
-      if (error) throw error;
+    if (error) throw error;
 
-      // Transformar los datos
-      const formattedFavorites = data.map((fav: any) => ({
-        id: fav.id,
-        vehicle_id: fav.vehicle_id,
-        created_at: fav.created_at,
-        vehicle: fav.vehicle_publications
-      }));
+    const formattedFavorites = data.map((fav: any) => ({
+  id: fav.id,
+  vehicle_id: fav.vehicle_id,
+  created_at: fav.created_at,
+  vehicle: fav.fk_vehicle || null
+}));
 
-      setFavorites(formattedFavorites);
-    } catch (error: any) {
-      console.error('Error loading favorites:', error);
-    }
-  };
+setFavorites(formattedFavorites);
+
+  } catch (error: any) {
+    console.error('Error loading favorites:', JSON.stringify(error, null, 2));
+    setFavorites([]); // prevenir que favorites sea undefined
+  }
+};
+
 
   const removeFavorite = async (favoriteId: string) => {
     setDeleting(true);
