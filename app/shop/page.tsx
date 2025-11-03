@@ -1,91 +1,171 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
-import { supabase } from '@/lib/supabaseClient';
-import { 
-  Car, Filter, Search, SlidersHorizontal, X, 
-  Loader2, Calendar, Gauge, DollarSign, ArrowUpDown,
-  ChevronDown, Eye, Fuel, Cog
-} from 'lucide-react';
-import { b } from 'framer-motion/client';
+import React, { useState, useEffect } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { supabase } from "@/lib/supabaseClient";
+import {
+  Car,
+  Filter,
+  Search,
+  SlidersHorizontal,
+  X,
+  Loader2,
+  Calendar,
+  Gauge,
+  DollarSign,
+  ArrowUpDown,
+  ChevronDown,
+  Eye,
+  Fuel,
+  Cog,
+  MapPin,
+} from "lucide-react";
 
-interface VehiclePublication {
-  id: string;
-  price: number;
-  brand: string;
-  model: string;
-  year: number;
-  mileage: number;
-  transmission: string;
-  fuel_type: string;
-  color: string;
-  engine_size: number;
-  description: string;
-  condition: string;
-  images: string[];
-  status: string;
-  created_at: string;
-  user_id: string;
-  vehicle_type: string;
+interface Vehicle {
+  id: number;
+  precio: number;
+  marca: string;
+  modelo: string;
+  anio: number;
+  kilometraje: number;
+  transmision: string;
+  tipo_combustible: string;
+  estado_vehiculo: string;
+  descripcion: string;
+  cilindrada: string;
+  tipo_vehiculo: string;
+  region: number;
+  ciudad: string;
+  created_at?: string;
+  oculto: boolean;
 }
 
-const VEHICLE_TYPES = ['Hatchback', 'Sedán', 'Coupé', 'SUV', 'Deportivo', 'Pick Up'];
+interface CatalogItem {
+  id: number;
+  nombre: string;
+}
 
+interface Region {
+  id: number;
+  nombre_region: string;
+}
+
+interface VehicleWithImages extends Vehicle {
+  images: string[];
+}
 
 const SORT_OPTIONS = [
-  { value: 'default', label: 'Por defecto (Recientes)' },
-  { value: 'price_desc', label: 'Precio: Mayor a Menor' },
-  { value: 'price_asc', label: 'Precio: Menor a Mayor' },
-  { value: 'year_desc', label: 'Año: Más nuevo' },
-  { value: 'year_asc', label: 'Año: Más antiguo' },
-  { value: 'mileage_asc', label: 'Kilometraje: Menor' },
+  { value: "default", label: "Por defecto (Recientes)" },
+  { value: "price_desc", label: "Precio: Mayor a Menor" },
+  { value: "price_asc", label: "Precio: Menor a Mayor" },
+  { value: "year_desc", label: "Año: Más nuevo" },
+  { value: "year_asc", label: "Año: Más antiguo" },
+  { value: "mileage_asc", label: "Kilometraje: Menor" },
 ];
 
 export default function ShopPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [loading, setLoading] = useState(true);
-  const [vehicles, setVehicles] = useState<VehiclePublication[]>([]);
-  const [filteredVehicles, setFilteredVehicles] = useState<VehiclePublication[]>([]);
+  const [vehicles, setVehicles] = useState<VehicleWithImages[]>([]);
+  const [filteredVehicles, setFilteredVehicles] = useState<VehicleWithImages[]>(
+    []
+  );
   const [showFilters, setShowFilters] = useState(false);
-  const [vehicleType, setVehicleType] = useState(searchParams?.get('vehicleType') || '');
+
+  const [tiposCombustible, setTiposCombustible] = useState<CatalogItem[]>([]);
+  const [tiposVehiculo, setTiposVehiculo] = useState<CatalogItem[]>([]);
+  const [regions, setRegions] = useState<Region[]>([]);
 
   // Filtros
   const [filters, setFilters] = useState({
-    search: '',
-    brand: '',
-    model: '',
-    yearMin: '',
-    yearMax: '',
-    priceMin: '',
-    priceMax: '',
-    condition: searchParams?.getAll('condition') || [],
-    vehicleType: vehicleType,
+    search: "",
+    brand: "",
+    model: "",
+    yearMin: "",
+    yearMax: "",
+    priceMin: "",
+    priceMax: "",
+    conditions: searchParams?.getAll("conditions") || [],
+    vehicleType: "",
+    region: "",
   });
 
-  const [sortBy, setSortBy] = useState('default');
+  const [sortBy, setSortBy] = useState("default");
+  const [imageErrors, setImageErrors] = useState<Set<number>>(new Set());
 
   useEffect(() => {
-    loadVehicles();
+    loadData();
   }, []);
 
   useEffect(() => {
     applyFiltersAndSort();
   }, [vehicles, filters, sortBy]);
 
-  const loadVehicles = async () => {
+  const loadData = async () => {
     try {
-      const { data, error } = await supabase
-        .from('vehicle_publications')
-        .select('*')
-        .eq('status', 'active')
-        .order('created_at', { ascending: false });
+      // Cargar tipos de combustible
+      const { data: combustibleData } = await supabase
+        .from("tipo_combustible")
+        .select("id, nombre");
+      setTiposCombustible(combustibleData || []);
 
-      if (error) throw error;
-      setVehicles(data || []);
+      // Cargar tipos de vehículo
+      const { data: tipoData } = await supabase
+        .from("tipo_vehiculo")
+        .select("id, nombre");
+      setTiposVehiculo(tipoData || []);
+
+      // Cargar regiones
+      const { data: regionesData } = await supabase
+        .from("region")
+        .select("id, nombre_region");
+      setRegions(regionesData || []);
+
+      // Cargar vehículos con sus imágenes (SOLO NO OCULTOS)
+      const { data: vehiculosData } = await supabase
+        .from("vehiculo")
+        .select("*")
+        .eq("oculto", false)
+        .order("created_at", { ascending: false });
+
+      if (!vehiculosData || vehiculosData.length === 0) {
+        setVehicles([]);
+        setLoading(false);
+        return;
+      }
+
+      // Cargar imágenes y mapear nombres para cada vehículo
+      const vehiculosConImagenes = await Promise.all(
+        vehiculosData.map(async (vehiculo) => {
+          // Cargar imágenes
+          const { data: imagenesData } = await supabase
+            .from("imagen_vehiculo")
+            .select("url_imagen")
+            .eq("vehiculo_id", vehiculo.id);
+
+          // Buscar nombre de combustible
+          const combustible = combustibleData?.find(
+            (c) => c.id === vehiculo.tipo_combustible_id
+          );
+
+          // Buscar nombre de tipo de vehículo
+          const tipoVehiculo = tipoData?.find(
+            (t) => t.id === vehiculo.tipo_vehiculo_id
+          );
+
+          return {
+            ...vehiculo,
+            images: imagenesData?.map((img) => img.url_imagen) || [],
+            tipo_combustible: combustible?.nombre || "Desconocido",
+            tipo_vehiculo: tipoVehiculo?.nombre || "Desconocido",
+          };
+        })
+      );
+
+      setVehicles(vehiculosConImagenes);
     } catch (error: any) {
-      console.error('Error loading vehicles:', error);
+      console.error("Error loading data:", error);
     } finally {
       setLoading(false);
     }
@@ -97,71 +177,86 @@ export default function ShopPage() {
     // Filtro de búsqueda (marca o modelo)
     if (filters.search) {
       const searchLower = filters.search.toLowerCase();
-      filtered = filtered.filter(v => 
-        v.brand.toLowerCase().includes(searchLower) ||
-        v.model.toLowerCase().includes(searchLower)
+      filtered = filtered.filter(
+        (v) =>
+          v.marca.toLowerCase().includes(searchLower) ||
+          v.modelo.toLowerCase().includes(searchLower)
       );
     }
 
     // Filtro de marca
     if (filters.brand) {
       const brandLower = filters.brand.toLowerCase();
-      filtered = filtered.filter(v => v.brand.toLowerCase().includes(brandLower));
+      filtered = filtered.filter((v) =>
+        v.marca.toLowerCase().includes(brandLower)
+      );
     }
 
     // Filtro de modelo
     if (filters.model) {
       const modelLower = filters.model.toLowerCase();
-      filtered = filtered.filter(v => v.model.toLowerCase().includes(modelLower));
+      filtered = filtered.filter((v) =>
+        v.modelo.toLowerCase().includes(modelLower)
+      );
     }
 
     // Filtro de año
     if (filters.yearMin) {
-      filtered = filtered.filter(v => v.year >= parseInt(filters.yearMin));
+      filtered = filtered.filter((v) => v.anio >= parseInt(filters.yearMin));
     }
     if (filters.yearMax) {
-      filtered = filtered.filter(v => v.year <= parseInt(filters.yearMax));
+      filtered = filtered.filter((v) => v.anio <= parseInt(filters.yearMax));
     }
 
     // Filtro de precio
     if (filters.priceMin) {
-      filtered = filtered.filter(v => v.price >= parseInt(filters.priceMin));
+      filtered = filtered.filter((v) => v.precio >= parseInt(filters.priceMin));
     }
     if (filters.priceMax) {
-      filtered = filtered.filter(v => v.price <= parseInt(filters.priceMax));
+      filtered = filtered.filter((v) => v.precio <= parseInt(filters.priceMax));
     }
 
     // Filtro de tipo de vehículo
     if (filters.vehicleType) {
-      filtered = filtered.filter(v => v.vehicle_type === filters.vehicleType);
+      filtered = filtered.filter(
+        (v) => v.tipo_vehiculo === filters.vehicleType
+      );
+    }
+
+    // Filtro de región
+    if (filters.region) {
+      filtered = filtered.filter((v) => v.region === parseInt(filters.region));
     }
 
     // Filtro de condición/estado
-    if (filters.condition.length > 0) {
-      filtered = filtered.filter(v => filters.condition.includes(v.condition));
+    if (filters.conditions.length > 0) {
+      filtered = filtered.filter((v) =>
+        filters.conditions.includes(v.estado_vehiculo)
+      );
     }
 
     // Ordenamiento
     switch (sortBy) {
-      case 'price_desc':
-        filtered.sort((a, b) => b.price - a.price);
+      case "price_desc":
+        filtered.sort((a, b) => b.precio - a.precio);
         break;
-      case 'price_asc':
-        filtered.sort((a, b) => a.price - b.price);
+      case "price_asc":
+        filtered.sort((a, b) => a.precio - b.precio);
         break;
-      case 'year_desc':
-        filtered.sort((a, b) => b.year - a.year);
+      case "year_desc":
+        filtered.sort((a, b) => b.anio - a.anio);
         break;
-      case 'year_asc':
-        filtered.sort((a, b) => a.year - b.year);
+      case "year_asc":
+        filtered.sort((a, b) => a.anio - b.anio);
         break;
-      case 'mileage_asc':
-        filtered.sort((a, b) => a.mileage - b.mileage);
+      case "mileage_asc":
+        filtered.sort((a, b) => a.kilometraje - b.kilometraje);
         break;
       default:
-        // Por defecto (recientes)
-        filtered.sort((a, b) => 
-          new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+        filtered.sort(
+          (a, b) =>
+            new Date(b.created_at || 0).getTime() -
+            new Date(a.created_at || 0).getTime()
         );
     }
 
@@ -170,33 +265,49 @@ export default function ShopPage() {
 
   const clearFilters = () => {
     setFilters({
-      search: '',
-      brand: '',
-      model: '',
-      yearMin: '',
-      yearMax: '',
-      priceMin: '',
-      priceMax: '',
-      condition: [],
-      vehicleType: '',
+      search: "",
+      brand: "",
+      model: "",
+      yearMin: "",
+      yearMax: "",
+      priceMin: "",
+      priceMax: "",
+      conditions: [],
+      vehicleType: "",
+      region: "",
     });
-    setSortBy('default');
-    // Limpiar parámetros de la URL
-    router.push('/shop');
+    setSortBy("default");
+    router.push("/shop");
   };
 
   const formatPrice = (price: number) => {
-    return new Intl.NumberFormat('es-CL', {
-      style: 'currency',
-      currency: 'CLP',
-      minimumFractionDigits: 0
+    return new Intl.NumberFormat("es-CL", {
+      style: "currency",
+      currency: "CLP",
+      minimumFractionDigits: 0,
     }).format(price);
   };
 
   const hasActiveFilters = () => {
-    return filters.search || filters.brand || filters.model || 
-           filters.yearMin || filters.yearMax || filters.priceMin || 
-           filters.priceMax || filters.condition || sortBy !== 'default';
+    return (
+      filters.search ||
+      filters.brand ||
+      filters.model ||
+      filters.yearMin ||
+      filters.yearMax ||
+      filters.priceMin ||
+      filters.priceMax ||
+      filters.conditions.length > 0 ||
+      filters.vehicleType ||
+      filters.region ||
+      sortBy !== "default"
+    );
+  };
+
+  const getRegionName = (regionId: number) => {
+    return (
+      regions.find((r) => r.id === regionId)?.nombre_region || "Desconocida"
+    );
   };
 
   if (loading) {
@@ -220,7 +331,8 @@ export default function ShopPage() {
             Tienda de Vehículos
           </h1>
           <p className="text-gray-600">
-            Encuentra tu próximo auto entre {vehicles.length} vehículos disponibles
+            Encuentra tu próximo auto entre {vehicles.length} vehículos
+            disponibles
           </p>
         </div>
 
@@ -233,7 +345,9 @@ export default function ShopPage() {
               <input
                 type="text"
                 value={filters.search}
-                onChange={(e) => setFilters({ ...filters, search: e.target.value })}
+                onChange={(e) =>
+                  setFilters({ ...filters, search: e.target.value })
+                }
                 placeholder="Buscar por marca o modelo..."
                 className="w-full pl-12 pr-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
               />
@@ -248,7 +362,7 @@ export default function ShopPage() {
                   onChange={(e) => setSortBy(e.target.value)}
                   className="w-full pl-12 pr-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent appearance-none bg-white"
                 >
-                  {SORT_OPTIONS.map(option => (
+                  {SORT_OPTIONS.map((option) => (
                     <option key={option.value} value={option.value}>
                       {option.label}
                     </option>
@@ -263,8 +377,8 @@ export default function ShopPage() {
               onClick={() => setShowFilters(!showFilters)}
               className={`flex items-center justify-center gap-2 px-6 py-3 rounded-xl font-semibold transition-all ${
                 showFilters
-                  ? 'bg-indigo-600 text-white'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  ? "bg-indigo-600 text-white"
+                  : "bg-gray-100 text-gray-700 hover:bg-gray-200"
               }`}
             >
               <SlidersHorizontal className="w-5 h-5" />
@@ -289,7 +403,9 @@ export default function ShopPage() {
                   <input
                     type="text"
                     value={filters.brand}
-                    onChange={(e) => setFilters({ ...filters, brand: e.target.value })}
+                    onChange={(e) =>
+                      setFilters({ ...filters, brand: e.target.value })
+                    }
                     placeholder="Ej: Toyota"
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                   />
@@ -303,7 +419,9 @@ export default function ShopPage() {
                   <input
                     type="text"
                     value={filters.model}
-                    onChange={(e) => setFilters({ ...filters, model: e.target.value })}
+                    onChange={(e) =>
+                      setFilters({ ...filters, model: e.target.value })
+                    }
                     placeholder="Ej: Corolla"
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                   />
@@ -316,12 +434,38 @@ export default function ShopPage() {
                   </label>
                   <select
                     value={filters.vehicleType}
-                    onChange={(e) => setFilters({ ...filters, vehicleType: e.target.value })}
+                    onChange={(e) =>
+                      setFilters({ ...filters, vehicleType: e.target.value })
+                    }
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                   >
                     <option value="">Todos los tipos</option>
-                    {VEHICLE_TYPES.map(type => (
-                      <option key={type} value={type}>{type}</option>
+                    {tiposVehiculo.map((type) => (
+                      <option key={type.id} value={type.nombre}>
+                        {type.nombre}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Region Filter */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <MapPin className="w-4 h-4 inline mr-1" />
+                    Región
+                  </label>
+                  <select
+                    value={filters.region}
+                    onChange={(e) =>
+                      setFilters({ ...filters, region: e.target.value })
+                    }
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                  >
+                    <option value="">Todas las regiones</option>
+                    {regions.map((region) => (
+                      <option key={region.id} value={region.id}>
+                        {region.nombre_region}
+                      </option>
                     ))}
                   </select>
                 </div>
@@ -335,14 +479,18 @@ export default function ShopPage() {
                     <input
                       type="number"
                       value={filters.yearMin}
-                      onChange={(e) => setFilters({ ...filters, yearMin: e.target.value })}
+                      onChange={(e) =>
+                        setFilters({ ...filters, yearMin: e.target.value })
+                      }
                       placeholder="Desde"
                       className="w-1/2 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                     />
                     <input
                       type="number"
                       value={filters.yearMax}
-                      onChange={(e) => setFilters({ ...filters, yearMax: e.target.value })}
+                      onChange={(e) =>
+                        setFilters({ ...filters, yearMax: e.target.value })
+                      }
                       placeholder="Hasta"
                       className="w-1/2 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                     />
@@ -358,14 +506,18 @@ export default function ShopPage() {
                     <input
                       type="number"
                       value={filters.priceMin}
-                      onChange={(e) => setFilters({ ...filters, priceMin: e.target.value })}
+                      onChange={(e) =>
+                        setFilters({ ...filters, priceMin: e.target.value })
+                      }
                       placeholder="Precio mínimo"
                       className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                     />
                     <input
                       type="number"
                       value={filters.priceMax}
-                      onChange={(e) => setFilters({ ...filters, priceMax: e.target.value })}
+                      onChange={(e) =>
+                        setFilters({ ...filters, priceMax: e.target.value })
+                      }
                       placeholder="Precio máximo"
                       className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                     />
@@ -423,23 +575,26 @@ export default function ShopPage() {
                 onClick={() => router.push(`/vehicle/${vehicle.id}`)}
               >
                 {/* Image */}
-                <div className="relative h-48 bg-gray-200">
-                  {vehicle.images && vehicle.images.length > 0 ? (
+                <div className="relative h-48 bg-gray-200 overflow-hidden">
+                  {!imageErrors.has(vehicle.id) && vehicle.images.length > 0 ? (
                     <img
                       src={vehicle.images[0]}
-                      alt={`${vehicle.brand} ${vehicle.model}`}
+                      alt={`${vehicle.marca} ${vehicle.modelo}`}
                       className="w-full h-full object-cover"
+                      onError={() =>
+                        setImageErrors((prev) => new Set(prev).add(vehicle.id))
+                      }
                     />
                   ) : (
-                    <div className="w-full h-full flex items-center justify-center">
+                    <div className="w-full h-full flex items-center justify-center bg-gray-200">
                       <Car className="w-16 h-16 text-gray-400" />
                     </div>
                   )}
-                  
+
                   {/* Year Badge */}
-                  <div className="absolute top-3 left-3">
+                  <div className="absolute top-3 left-3 z-10">
                     <span className="px-3 py-1 bg-white/90 backdrop-blur-sm rounded-full text-xs font-bold text-gray-800">
-                      {vehicle.year}
+                      {vehicle.anio}
                     </span>
                   </div>
                 </div>
@@ -447,28 +602,34 @@ export default function ShopPage() {
                 {/* Content */}
                 <div className="p-5">
                   <h3 className="text-lg font-bold text-gray-800 mb-1">
-                    {vehicle.brand} {vehicle.model}
+                    {vehicle.marca} {vehicle.modelo}
                   </h3>
                   <p className="text-2xl font-bold text-indigo-600 mb-3">
-                    {formatPrice(vehicle.price)}
+                    {formatPrice(vehicle.precio)}
                   </p>
 
                   <div className="space-y-2 text-sm text-gray-600">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-1">
                         <Gauge className="w-4 h-4" />
-                        <span>{vehicle.mileage.toLocaleString()} km</span>
+                        <span>{vehicle.kilometraje.toLocaleString()} km</span>
                       </div>
                       <div className="flex items-center gap-1">
                         <Cog className="w-4 h-4" />
-                        <span>{vehicle.transmission}</span>
+                        <span>{vehicle.transmision}</span>
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
                       <Fuel className="w-4 h-4" />
-                      <span>{vehicle.fuel_type}</span>
+                      <span>{vehicle.tipo_combustible}</span>
                       <span className="mx-1">•</span>
-                      <span>{vehicle.color}</span>
+                      <span>{vehicle.cilindrada}cc</span>
+                    </div>
+                    <div className="flex items-center gap-1 text-gray-500">
+                      <MapPin className="w-4 h-4" />
+                      <span>
+                        {vehicle.ciudad}, {getRegionName(vehicle.region)}
+                      </span>
                     </div>
                   </div>
 

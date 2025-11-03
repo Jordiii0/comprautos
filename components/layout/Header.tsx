@@ -3,14 +3,91 @@
 import Link from "next/link";
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabaseClient";
-import { ShoppingCart, User, Menu, X, ChevronDown, LogIn, UserCircle } from "lucide-react";
+import { Menu, X, ChevronDown, LogIn, UserCircle, Shield } from "lucide-react";
+import { Car } from "lucide-react";
 
 export default function Header() {
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const [profileRoute, setProfileRoute] = useState("/profile");
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [userInfo, setUserInfo] = useState<{ name?: string; accountType?: string } | null>(null);
+  const [userInfo, setUserInfo] = useState<{
+    name?: string;
+    accountType?: "user" | "business" | "admin";
+  } | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  // Función para detectar el tipo de usuario
+  const detectUserType = async (userId: string, userEmail: string) => {
+    try {
+      console.log("🔍 Detectando tipo de usuario para:", userId, userEmail);
+
+      // 1. Verificar si es USUARIO (incluye administradores)
+      const { data: usuarioData, error: usuarioError } = await supabase
+        .from("usuario")
+        .select("id, nombre, apellido, rol")
+        .eq("usuario_id", userId)
+        .maybeSingle();
+
+      console.log("👤 Búsqueda usuario:", usuarioData, usuarioError);
+
+      if (usuarioData) {
+        // Verificar si es ADMINISTRADOR
+        if (usuarioData.rol === "administrador") {
+          console.log("✅ ENCONTRADO: Es ADMINISTRADOR");
+          return {
+            accountType: "admin" as const,
+            name:
+              `${usuarioData.nombre} ${usuarioData.apellido}`.trim() || "Admin",
+            route: "/admin/profile",
+          };
+        }
+
+        // Es usuario normal
+        console.log("✅ ENCONTRADO: Es USUARIO NORMAL");
+        return {
+          accountType: "user" as const,
+          name:
+            `${usuarioData.nombre} ${usuarioData.apellido}`.trim() ||
+            "Mi Perfil",
+          route: "/profile",
+        };
+      }
+
+      // 2. Si no es usuario, verificar si es EMPRESA
+      const { data: empresaData, error: empresaError } = await supabase
+        .from("empresa")
+        .select("id, nombre_empresa")
+        .eq("usuario_id", userId)
+        .maybeSingle();
+
+      console.log("🏢 Búsqueda empresa:", empresaData, empresaError);
+
+      if (empresaData) {
+        console.log("✅ ENCONTRADO: Es EMPRESA");
+        return {
+          accountType: "business" as const,
+          name: empresaData.nombre_empresa || "Empresa",
+          route: "/business-profile",
+        };
+      }
+
+      // Si no existe en ninguna tabla
+      console.log("⚠️ Usuario no encontrado en ninguna tabla");
+      return {
+        accountType: "user" as const,
+        name: "Mi Perfil",
+        route: "/profile",
+      };
+    } catch (error) {
+      console.error("❌ Error detectando tipo de usuario:", error);
+      return {
+        accountType: "user" as const,
+        name: "Mi Perfil",
+        route: "/profile",
+      };
+    }
+  };
 
   useEffect(() => {
     const handleScroll = () => {
@@ -22,46 +99,56 @@ export default function Header() {
 
   useEffect(() => {
     const checkUserType = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      
-      if (session?.user) {
-        setIsAuthenticated(true);
-        const accountType = session.user.user_metadata?.account_type;
-        
-        setUserInfo({
-          name: session.user.user_metadata?.full_name || session.user.email?.split('@')[0],
-          accountType: accountType
-        });
+      try {
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
 
-        if (accountType === 'business') {
-          setProfileRoute("/business-profile");
+        if (session?.user?.id && session?.user?.email) {
+          const userType = await detectUserType(
+            session.user.id,
+            session.user.email
+          );
+
+          setIsAuthenticated(true);
+          setUserInfo({
+            name: userType.name,
+            accountType: userType.accountType,
+          });
+          setProfileRoute(userType.route);
         } else {
+          setIsAuthenticated(false);
+          setUserInfo(null);
           setProfileRoute("/profile");
         }
-      } else {
+      } catch (error) {
+        console.error("Error checking user type:", error);
         setIsAuthenticated(false);
-        setUserInfo(null);
+      } finally {
+        setLoading(false);
       }
     };
 
     checkUserType();
 
     // Escuchar cambios de autenticación
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (session?.user) {
-        setIsAuthenticated(true);
-        const accountType = session.user.user_metadata?.account_type;
-        
-        setUserInfo({
-          name: session.user.user_metadata?.full_name || session.user.email?.split('@')[0],
-          accountType: accountType
-        });
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (session?.user?.id && session?.user?.email) {
+        const userType = await detectUserType(
+          session.user.id,
+          session.user.email
+        );
 
-        if (accountType === 'business') {
-          setProfileRoute("/business-profile");
-        } else {
-          setProfileRoute("/profile");
-        }
+        setIsAuthenticated(true);
+        setUserInfo({
+          name: userType.name,
+          accountType: userType.accountType,
+        });
+        setProfileRoute(userType.route);
+
+        console.log("🎯 Profile route actualizado a:", userType.route);
       } else {
         setIsAuthenticated(false);
         setUserInfo(null);
@@ -69,7 +156,9 @@ export default function Header() {
       }
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      subscription?.unsubscribe();
+    };
   }, []);
 
   return (
@@ -87,16 +176,7 @@ export default function Header() {
             <div className="flex items-center space-x-2">
               <div className="relative">
                 <div className="w-10 h-10 bg-gradient-to-br from-indigo-600 to-purple-600 rounded-xl flex items-center justify-center transform group-hover:scale-105 transition-transform duration-200 shadow-md">
-                  <svg
-                    className="w-6 h-6 text-white"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth={2.5}
-                    viewBox="0 0 24 24"
-                  >
-                    <path d="M5 17H4a2 2 0 01-2-2V5a2 2 0 012-2h16a2 2 0 012 2v10a2 2 0 01-2 2h-1" />
-                    <polygon points="12 15 17 21 7 21 12 15" />
-                  </svg>
+                  <Car className="w-6 h-6 text-white" />
                 </div>
                 <div className="absolute -top-1 -right-1 w-3 h-3 bg-green-400 rounded-full animate-pulse"></div>
               </div>
@@ -133,28 +213,47 @@ export default function Header() {
           {/* Actions */}
           <div className="flex items-center space-x-2 lg:space-x-3">
             {/* Publish Button */}
-            <Link href="/publication">
-              <div className="relative group">
-                <div className="p-2 lg:px-4 lg:py-2 rounded-xl hover:bg-gray-100 transition-all duration-200 flex items-center space-x-2">
-                  <span className="hidden lg:block text-sm font-semibold text-gray-700 group-hover:text-indigo-600 transition-colors">
-                    Vende tu Auto
-                  </span>
+            {isAuthenticated && userInfo?.accountType !== "admin" && (
+              <Link href="/publication">
+                <div className="relative group">
+                  <div className="p-2 lg:px-4 lg:py-2 rounded-xl hover:bg-gray-100 transition-all duration-200 flex items-center space-x-2">
+                    <span className="hidden lg:block text-sm font-semibold text-gray-700 group-hover:text-indigo-600 transition-colors">
+                      Vende tu Auto
+                    </span>
+                  </div>
                 </div>
-              </div>
-            </Link>
+              </Link>
+            )}
 
             {/* Profile/Login Button - Desktop */}
-            {isAuthenticated ? (
+            {!loading && isAuthenticated ? (
               <Link href={profileRoute}>
-                <div className="hidden lg:flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-xl hover:shadow-lg hover:scale-105 transition-all duration-200 group relative">
+                <div
+                  className={`hidden lg:flex items-center space-x-2 px-4 py-2 rounded-xl hover:shadow-lg hover:scale-105 transition-all duration-200 group relative ${
+                    userInfo?.accountType === "admin"
+                      ? "bg-gradient-to-r from-amber-500 to-orange-600 text-white"
+                      : "bg-gradient-to-r from-indigo-600 to-purple-600 text-white"
+                  }`}
+                >
                   <div className="absolute -top-1 -right-1 w-3 h-3 bg-green-400 rounded-full border-2 border-white"></div>
-                  <UserCircle className="w-5 h-5" />
+                  {userInfo?.accountType === "admin" ? (
+                    <Shield className="w-5 h-5" />
+                  ) : (
+                    <UserCircle className="w-5 h-5" />
+                  )}
                   <div className="flex flex-col">
                     <span className="text-sm font-semibold leading-tight">
-                      {userInfo?.name || 'Mi Perfil'}
+                      {userInfo?.name || "Mi Perfil"}
                     </span>
-                    {userInfo?.accountType === 'business' && (
-                      <span className="text-[10px] opacity-90 leading-tight">Empresa</span>
+                    {userInfo?.accountType === "business" && (
+                      <span className="text-[10px] opacity-90 leading-tight">
+                        Empresa
+                      </span>
+                    )}
+                    {userInfo?.accountType === "admin" && (
+                      <span className="text-[10px] opacity-90 leading-tight">
+                        Administrador
+                      </span>
                     )}
                   </div>
                 </div>
@@ -169,11 +268,18 @@ export default function Header() {
             )}
 
             {/* Mobile Profile/Login Icon */}
-            <Link href={isAuthenticated ? profileRoute : "/login"} className="lg:hidden">
+            <Link
+              href={isAuthenticated ? profileRoute : "/login"}
+              className="lg:hidden"
+            >
               <div className="relative p-2 rounded-xl hover:bg-gray-100 transition-all">
                 {isAuthenticated ? (
                   <>
-                    <UserCircle className="w-5 h-5 text-indigo-600" />
+                    {userInfo?.accountType === "admin" ? (
+                      <Shield className="w-5 h-5 text-amber-600" />
+                    ) : (
+                      <UserCircle className="w-5 h-5 text-indigo-600" />
+                    )}
                     <div className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-green-400 rounded-full border border-white"></div>
                   </>
                 ) : (
@@ -222,17 +328,37 @@ export default function Header() {
 
               <div className="pt-4 mt-4 border-t border-gray-100">
                 {isAuthenticated ? (
-                  <Link href={profileRoute} onClick={() => setIsMobileOpen(false)}>
-                    <div className="flex items-center justify-between px-4 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-lg hover:shadow-lg transition-all font-semibold">
+                  <Link
+                    href={profileRoute}
+                    onClick={() => setIsMobileOpen(false)}
+                  >
+                    <div
+                      className={`flex items-center justify-between px-4 py-3 rounded-lg hover:shadow-lg transition-all font-semibold ${
+                        userInfo?.accountType === "admin"
+                          ? "bg-gradient-to-r from-amber-500 to-orange-600 text-white"
+                          : "bg-gradient-to-r from-indigo-600 to-purple-600 text-white"
+                      }`}
+                    >
                       <div className="flex items-center space-x-3">
                         <div className="relative">
-                          <UserCircle className="w-5 h-5" />
+                          {userInfo?.accountType === "admin" ? (
+                            <Shield className="w-5 h-5" />
+                          ) : (
+                            <UserCircle className="w-5 h-5" />
+                          )}
                           <div className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-green-400 rounded-full border border-white"></div>
                         </div>
                         <div className="flex flex-col items-start">
-                          <span>{userInfo?.name || 'Mi Perfil'}</span>
-                          {userInfo?.accountType === 'business' && (
-                            <span className="text-xs opacity-90">Cuenta Empresa</span>
+                          <span>{userInfo?.name || "Mi Perfil"}</span>
+                          {userInfo?.accountType === "business" && (
+                            <span className="text-xs opacity-90">
+                              Cuenta Empresa
+                            </span>
+                          )}
+                          {userInfo?.accountType === "admin" && (
+                            <span className="text-xs opacity-90">
+                              Administrador
+                            </span>
                           )}
                         </div>
                       </div>

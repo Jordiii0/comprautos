@@ -1,361 +1,334 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
-import { supabase } from '@/lib/supabaseClient';
-import { Lock, Mail, AlertCircle, UserPlus, User, Building2, Briefcase } from 'lucide-react';
+import React, { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { supabase } from "@/lib/supabaseClient";
+import {
+  Mail,
+  Lock,
+  Eye,
+  EyeOff,
+  AlertCircle,
+  CheckCircle,
+  Loader2,
+} from "lucide-react";
 
 export default function LoginPage() {
   const router = useRouter();
-  const [isLogin, setIsLogin] = useState(true);
-  const [accountType, setAccountType] = useState<'personal' | 'business'>('personal');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [fullName, setFullName] = useState('');
-  const [position, setPosition] = useState('');
-  const [error, setError] = useState('');
+  const [loginForm, setLoginForm] = useState({
+    email: "",
+    password: "",
+  });
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [successMessage, setSuccessMessage] = useState('');
+  const [errorMessage, setErrorMessage] = useState("");
+  const [successMessage, setSuccessMessage] = useState("");
 
   useEffect(() => {
-    const checkUser = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
+    checkAuth();
+  }, []);
+
+  const checkAuth = async () => {
+    try {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
       if (session) {
-        router.push('/profile');
-      }
-    };
-    checkUser();
-  }, [router]);
+        // Verificar qué tipo de usuario es
+        const { data: userData } = await supabase
+          .from("usuario")
+          .select("id, rol")
+          .eq("usuario_id", session.user.id)
+          .maybeSingle();
 
-  const handleLogin = async () => {
-    setError('');
-    setLoading(true);
-
-    if (!email || !password) {
-      setError('Por favor completa todos los campos');
-      setLoading(false);
-      return;
-    }
-
-    try {
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
-
-      if (error) throw error;
-
-      if (data.session) {
-        // Redirigir según el tipo de cuenta
-        const accountType = data.user.user_metadata?.account_type;
-        if (accountType === 'business') {
-          router.push('/business-profile');
-        } else {
-          router.push('/profile');
-        }
-      }
-    } catch (error: any) {
-      setError(error.message || 'Error al iniciar sesión');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleRegister = async () => {
-    setError('');
-    setSuccessMessage('');
-    setLoading(true);
-
-    // Validaciones comunes
-    if (!email || !password || !confirmPassword) {
-      setError('Por favor completa todos los campos');
-      setLoading(false);
-      return;
-    }
-
-    // Validaciones específicas para cuenta empresa
-    if (accountType === 'business' && (!fullName || !position)) {
-      setError('Por favor completa todos los campos de la empresa');
-      setLoading(false);
-      return;
-    }
-
-    if (password.length < 6) {
-      setError('La contraseña debe tener al menos 6 caracteres');
-      setLoading(false);
-      return;
-    }
-
-    if (password !== confirmPassword) {
-      setError('Las contraseñas no coinciden');
-      setLoading(false);
-      return;
-    }
-
-    try {
-      const { data, error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          data: {
-            account_type: accountType,
-            full_name: accountType === 'business' ? fullName : undefined,
-            position: accountType === 'business' ? position : undefined,
+        if (userData) {
+          // Es usuario normal
+          console.log("✅ Usuario encontrado:", userData.rol);
+          if (userData.rol === "administrador") {
+            router.push("/admin/profile");
+          } else {
+            router.push("/profile");
           }
+          return;
         }
+
+        // Verificar si es empresa
+        const { data: empresaData } = await supabase
+          .from("empresa")
+          .select("id")
+          .eq("usuario_id", session.user.id)
+          .maybeSingle();
+
+        if (empresaData) {
+          // Es empresa
+          console.log("✅ Empresa encontrada");
+          router.push("/business-profile");
+          return;
+        }
+
+        // Si no es ni usuario ni empresa, mantener en login
+        console.log("⚠️ No se encontró tipo de usuario");
+      }
+    } catch (error) {
+      console.error("Error checking auth:", error);
+    }
+  };
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setLoginForm((prev) => ({
+      ...prev,
+      [name]: value,
+    }));
+    setErrorMessage("");
+  };
+
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setErrorMessage("");
+    setSuccessMessage("");
+
+    try {
+      // Validar campos
+      if (!loginForm.email.trim() || !loginForm.password.trim()) {
+        setErrorMessage("Por favor completa todos los campos");
+        setLoading(false);
+        return;
+      }
+
+      if (!loginForm.email.includes("@")) {
+        setErrorMessage("Por favor ingresa un email válido");
+        setLoading(false);
+        return;
+      }
+
+      console.log("🔐 Intentando login con:", loginForm.email);
+
+      // Autenticar con Supabase
+      const { data, error: authError } = await supabase.auth.signInWithPassword({
+        email: loginForm.email,
+        password: loginForm.password,
       });
 
-      if (error) throw error;
-
-      if (data.user) {
-        setSuccessMessage('¡Cuenta creada exitosamente! Redirigiendo...');
-        setTimeout(() => {
-          router.push('/profile');
-        }, 2000);
+      if (authError) {
+        console.error("❌ Error de autenticación:", authError);
+        setErrorMessage(
+          authError.message === "Invalid login credentials"
+            ? "Email o contraseña incorrectos"
+            : authError.message
+        );
+        setLoading(false);
+        return;
       }
+
+      if (!data.user) {
+        setErrorMessage("Error al iniciar sesión");
+        setLoading(false);
+        return;
+      }
+
+      console.log("✅ Usuario autenticado:", data.user.id);
+
+      // Verificar qué tipo de usuario es
+      const { data: userData, error: userError } = await supabase
+        .from("usuario")
+        .select("id, rol, habilitado")
+        .eq("usuario_id", data.user.id)
+        .maybeSingle();
+
+      if (userData) {
+        console.log("✅ Usuario encontrado:", userData);
+
+        // Verificar si está habilitado (solo para usuarios normales, no para admin)
+        if (userData.rol !== "administrador" && !userData.habilitado) {
+          console.log("❌ Usuario deshabilitado");
+          setErrorMessage(
+            "Tu cuenta ha sido deshabilitada. Contacta al administrador."
+          );
+          await supabase.auth.signOut();
+          setLoading(false);
+          return;
+        }
+
+        setSuccessMessage("¡Bienvenido!");
+
+        // Redirigir según el rol
+        setTimeout(() => {
+          if (userData.rol === "administrador") {
+            console.log("→ Redirigiendo a admin");
+            router.push("/admin/profile");
+          } else {
+            console.log("→ Redirigiendo a usuario");
+            router.push("/profile");
+          }
+        }, 1500);
+        return;
+      }
+
+      // Si no está en usuario, verificar si es empresa
+      console.log("🔍 Verificando si es empresa...");
+      const { data: empresaData, error: empresaError } = await supabase
+        .from("empresa")
+        .select("id, validada")
+        .eq("usuario_id", data.user.id)
+        .maybeSingle();
+
+      if (empresaData) {
+        console.log("✅ Empresa encontrada:", empresaData);
+
+        setSuccessMessage("¡Bienvenido!");
+        setTimeout(() => {
+          console.log("→ Redirigiendo a empresa");
+          router.push("/business-profile");
+        }, 1500);
+        return;
+      }
+
+      // No encontró ni usuario ni empresa
+      console.log("❌ No se encontró perfil");
+      setErrorMessage("No se encontró tu perfil. Contacta al administrador.");
+      await supabase.auth.signOut();
+      setLoading(false);
     } catch (error: any) {
-      setError(error.message || 'Error al crear la cuenta');
-    } finally {
+      console.error("❌ Error en login:", error);
+      setErrorMessage(
+        error.message || "Ocurrió un error. Por favor intenta de nuevo."
+      );
       setLoading(false);
     }
-  };
-
-  const handleSubmit = () => {
-    if (isLogin) {
-      handleLogin();
-    } else {
-      handleRegister();
-    }
-  };
-
-  const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !loading) {
-      handleSubmit();
-    }
-  };
-
-  const switchMode = () => {
-    setIsLogin(!isLogin);
-    setError('');
-    setSuccessMessage('');
-    setPassword('');
-    setConfirmPassword('');
-    setFullName('');
-    setPosition('');
-    setAccountType('personal');
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
-      <div className="bg-white rounded-lg shadow-xl p-8 w-full max-w-md">
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-indigo-100 rounded-full mb-4">
-            {isLogin ? (
-              <Lock className="w-8 h-8 text-indigo-600" />
-            ) : (
-              <UserPlus className="w-8 h-8 text-indigo-600" />
-            )}
-          </div>
-          <h1 className="text-3xl font-bold text-gray-800">
-            {isLogin ? 'Iniciar Sesión' : 'Crear Cuenta'}
-          </h1>
-          <p className="text-gray-600 mt-2">
-            {isLogin ? 'Accede a tu cuenta' : 'Regístrate para comenzar'}
-          </p>
-        </div>
-
-        {/* Account Type Selection - Solo para registro */}
-        {!isLogin && (
-          <div className="mb-6">
-            <label className="block text-sm font-medium text-gray-700 mb-3">
-              Tipo de Cuenta
-            </label>
-            <div className="grid grid-cols-2 gap-3">
-              <button
-                type="button"
-                onClick={() => setAccountType('personal')}
-                className={`flex flex-col items-center gap-2 p-4 rounded-lg border-2 transition-all ${
-                  accountType === 'personal'
-                    ? 'border-indigo-600 bg-indigo-50'
-                    : 'border-gray-200 hover:border-indigo-300'
-                }`}
-              >
-                <User className={`w-6 h-6 ${accountType === 'personal' ? 'text-indigo-600' : 'text-gray-400'}`} />
-                <span className={`text-sm font-semibold ${accountType === 'personal' ? 'text-indigo-600' : 'text-gray-700'}`}>
-                  Personal
-                </span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setAccountType('business')}
-                className={`flex flex-col items-center gap-2 p-4 rounded-lg border-2 transition-all ${
-                  accountType === 'business'
-                    ? 'border-indigo-600 bg-indigo-50'
-                    : 'border-gray-200 hover:border-indigo-300'
-                }`}
-              >
-                <Building2 className={`w-6 h-6 ${accountType === 'business' ? 'text-indigo-600' : 'text-gray-400'}`} />
-                <span className={`text-sm font-semibold ${accountType === 'business' ? 'text-indigo-600' : 'text-gray-700'}`}>
-                  Empresa
-                </span>
-              </button>
+    <div className="min-h-screen bg-gradient-to-br from-indigo-50 to-purple-100 flex items-center justify-center p-4">
+      <div className="w-full max-w-md">
+        {/* Card */}
+        <div className="bg-white rounded-2xl shadow-2xl p-8">
+          {/* Logo */}
+          <div className="mb-8 text-center">
+            <div className="inline-block p-3 bg-gradient-to-br from-indigo-600 to-purple-600 rounded-xl mb-4">
+              <Lock className="w-8 h-8 text-white" />
             </div>
-          </div>
-        )}
-
-        <div className="space-y-6">
-          {/* Campos específicos para cuenta empresa */}
-          {!isLogin && accountType === 'business' && (
-            <>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Nombre Completo
-                </label>
-                <div className="relative">
-                  <User className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
-                  <input
-                    type="text"
-                    value={fullName}
-                    onChange={(e) => setFullName(e.target.value)}
-                    onKeyPress={handleKeyPress}
-                    className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                    placeholder="Juan Pérez"
-                    disabled={loading}
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Cargo en la Empresa
-                </label>
-                <div className="relative">
-                  <Briefcase className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
-                  <input
-                    type="text"
-                    value={position}
-                    onChange={(e) => setPosition(e.target.value)}
-                    onKeyPress={handleKeyPress}
-                    className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                    placeholder="Gerente de Ventas"
-                    disabled={loading}
-                  />
-                </div>
-              </div>
-            </>
-          )}
-
-          {/* Correo electrónico */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Correo Electrónico
-            </label>
-            <div className="relative">
-              <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                onKeyPress={handleKeyPress}
-                className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                placeholder="tu@email.com"
-                disabled={loading}
-              />
-            </div>
+            <h1 className="text-3xl font-bold text-gray-900">carNETwork</h1>
+            <p className="text-gray-600 mt-2">ComprAutos</p>
           </div>
 
-          {/* Contraseña */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Contraseña
-            </label>
-            <div className="relative">
-              <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
-              <input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                onKeyPress={handleKeyPress}
-                className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                placeholder="••••••••"
-                disabled={loading}
-              />
-            </div>
-            {!isLogin && (
-              <p className="text-xs text-gray-500 mt-1">
-                Mínimo 6 caracteres
-              </p>
-            )}
-          </div>
-
-          {/* Confirmar contraseña - Solo para registro */}
-          {!isLogin && (
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Confirmar Contraseña
-              </label>
-              <div className="relative">
-                <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
-                <input
-                  type="password"
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  onKeyPress={handleKeyPress}
-                  className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                  placeholder="••••••••"
-                  disabled={loading}
-                />
-              </div>
-            </div>
-          )}
-
-          {/* Mensajes de error y éxito */}
-          {error && (
-            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm flex items-center gap-2">
-              <AlertCircle className="w-5 h-5 flex-shrink-0" />
-              <span>{error}</span>
+          {/* Mensajes */}
+          {errorMessage && (
+            <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg flex items-start gap-3">
+              <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+              <p className="text-red-700 text-sm">{errorMessage}</p>
             </div>
           )}
 
           {successMessage && (
-            <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg text-sm flex items-center gap-2">
-              <span>✓ {successMessage}</span>
+            <div className="mb-4 p-4 bg-green-50 border border-green-200 rounded-lg flex items-start gap-3">
+              <CheckCircle className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
+              <p className="text-green-700 text-sm">{successMessage}</p>
             </div>
           )}
 
-          {/* Botón principal */}
-          <button
-            onClick={handleSubmit}
-            disabled={loading}
-            className="w-full bg-indigo-600 text-white py-3 rounded-lg font-semibold hover:bg-indigo-700 transition-colors shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {loading ? (
-              isLogin ? 'Iniciando sesión...' : 'Creando cuenta...'
-            ) : (
-              isLogin ? 'Iniciar Sesión' : 'Crear Cuenta'
-            )}
-          </button>
+          {/* Formulario */}
+          <form onSubmit={handleLogin} className="space-y-5">
+            {/* Email */}
+            <div>
+              <label htmlFor="email" className="block text-sm font-semibold text-gray-700 mb-2">
+                Email
+              </label>
+              <div className="relative">
+                <Mail className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+                <input
+                  id="email"
+                  type="email"
+                  name="email"
+                  value={loginForm.email}
+                  onChange={handleInputChange}
+                  placeholder="tu@email.com"
+                  className="w-full pl-12 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-600 focus:border-transparent outline-none transition"
+                  disabled={loading}
+                />
+              </div>
+            </div>
+
+            {/* Contraseña */}
+            <div>
+              <label htmlFor="password" className="block text-sm font-semibold text-gray-700 mb-2">
+                Contraseña
+              </label>
+              <div className="relative">
+                <Lock className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+                <input
+                  id="password"
+                  type={showPassword ? "text" : "password"}
+                  name="password"
+                  value={loginForm.password}
+                  onChange={handleInputChange}
+                  placeholder="••••••••"
+                  className="w-full pl-12 pr-12 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-600 focus:border-transparent outline-none transition"
+                  disabled={loading}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 transition"
+                  disabled={loading}
+                >
+                  {showPassword ? (
+                    <EyeOff className="w-5 h-5" />
+                  ) : (
+                    <Eye className="w-5 h-5" />
+                  )}
+                </button>
+              </div>
+            </div>
+
+            {/* Botón Login */}
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-bold py-3 rounded-lg hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+            >
+              {loading ? (
+                <>
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                  Iniciando sesión...
+                </>
+              ) : (
+                "Iniciar Sesión"
+              )}
+            </button>
+          </form>
 
           {/* Separador */}
-          <div className="relative">
-            <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-gray-300"></div>
-            </div>
-            <div className="relative flex justify-center text-sm">
-              <span className="px-2 bg-white text-gray-500">o</span>
-            </div>
+          <div className="my-6 flex items-center gap-3">
+            <div className="flex-1 h-px bg-gray-300"></div>
+            <span className="text-gray-500 text-sm">¿No tienes cuenta?</span>
+            <div className="flex-1 h-px bg-gray-300"></div>
           </div>
 
-          {/* Switch entre login y registro */}
-          <button
-            onClick={switchMode}
-            disabled={loading}
-            className="w-full text-indigo-600 hover:text-indigo-700 font-medium transition-colors disabled:opacity-50"
-          >
-            {isLogin ? '¿No tienes cuenta? Créala aquí' : '¿Ya tienes cuenta? Inicia sesión'}
-          </button>
+          {/* Links de Registro */}
+          <div className="space-y-3">
+            <button
+              onClick={() => router.push("/register")}
+              className="w-full border-2 border-indigo-600 text-indigo-600 font-bold py-3 rounded-lg hover:bg-indigo-50 transition"
+              disabled={loading}
+            >
+              Registrarse como Usuario
+            </button>
+            <button
+              onClick={() => router.push("/register-empresa")}
+              className="w-full border-2 border-purple-600 text-purple-600 font-bold py-3 rounded-lg hover:bg-purple-50 transition"
+              disabled={loading}
+            >
+              Registrarse como Empresa
+            </button>
+          </div>
+
+          {/* Footer */}
+          <p className="text-center text-gray-500 text-xs mt-6">
+            Al iniciar sesión aceptas nuestros términos y condiciones
+          </p>
         </div>
       </div>
     </div>

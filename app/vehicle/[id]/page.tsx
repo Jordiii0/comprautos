@@ -1,8 +1,15 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, {
+  useState,
+  useEffect,
+  useRef,
+  useCallback,
+  useMemo,
+} from "react";
 import { useRouter, useParams } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
+import ReportButton from "@/components/ReportButton";
 import {
   Car,
   ArrowLeft,
@@ -12,7 +19,6 @@ import {
   DollarSign,
   Fuel,
   Cog,
-  Palette,
   Wrench,
   User,
   Phone,
@@ -25,37 +31,45 @@ import {
   ChevronRight,
   CheckCircle,
   X,
-  Building2,
 } from "lucide-react";
 
-interface VehiclePublication {
-  id: string;
-  price: number;
-  brand: string;
-  model: string;
-  year: number;
-  mileage: number;
-  transmission: string;
-  fuel_type: string;
-  color: string;
-  engine_size: number;
-  description: string;
-  condition: string;
-  images: string[];
-  status: string;
+interface Vehicle {
+  id: number;
+  precio: number;
+  marca: string;
+  modelo: string;
+  anio: number;
+  kilometraje: number;
+  transmision: string;
+  tipo_combustible_id: number;
+  tipo_vehiculo_id: number;
+  estado_vehiculo: string;
+  descripcion: string;
+  cilindrada: string;
+  region: number;
+  ciudad: string;
   created_at: string;
-  user_id: string;
-  vehicle_type: string;
+  correo_dueno?: string;
+}
+
+interface VehicleDetail extends Vehicle {
+  images: string[];
+  tipo_combustible: string;
+  tipo_vehiculo: string;
 }
 
 interface SellerProfile {
-  full_name: string;
-  username: string;
-  phone: string;
-  region: string;
-  city: string;
-  is_company?: boolean;
-  company_name?: string;
+  nombre: string;
+  apellido: string;
+  correo_electronico: string;
+  telefono?: string;
+  ciudad?: string;
+  region_nombre?: string;
+}
+
+interface Region {
+  id: number;
+  nombre_region: string;
 }
 
 export default function VehicleDetailPage() {
@@ -64,12 +78,17 @@ export default function VehicleDetailPage() {
   const vehicleId = params?.id as string;
 
   const [loading, setLoading] = useState(true);
-  const [vehicle, setVehicle] = useState<VehiclePublication | null>(null);
+  const [vehicle, setVehicle] = useState<VehicleDetail | null>(null);
   const [seller, setSeller] = useState<SellerProfile | null>(null);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [showContactModal, setShowContactModal] = useState(false);
   const [isFavorite, setIsFavorite] = useState(false);
   const [user, setUser] = useState<any>(null);
+  const [imageErrors, setImageErrors] = useState<Set<number>>(new Set());
+  const [error, setError] = useState("");
+
+  // ✅ Caché de regiones
+  const regionsCache = useRef<Map<number, string>>(new Map());
 
   useEffect(() => {
     if (vehicleId) {
@@ -77,185 +96,317 @@ export default function VehicleDetailPage() {
     }
   }, [vehicleId]);
 
-  const getSellerProfileRoute = () => {
-    return `/seller-profile/${vehicle?.user_id}`;
-  }
+  const handleImageError = useCallback((index: number) => {
+    setImageErrors((prev) => new Set(prev).add(index));
+  }, []);
 
-  const loadVehicleDetails = async () => {
+  const loadVehicleDetails = useCallback(async () => {
     try {
-      // Verificar sesión del usuario
+      setError("");
+      console.log("📥 Cargando detalles del vehículo:", vehicleId);
+
+      // ✅ 1. Verificar sesión
       const {
         data: { session },
       } = await supabase.auth.getSession();
       if (session) {
         setUser(session.user);
-        // Verificar si está en favoritos
+      }
+
+      // ✅ 2. Cargar regiones
+      if (regionsCache.current.size === 0) {
+        const { data: regionesData } = await supabase
+          .from("region")
+          .select("id, nombre_region");
+
+        if (regionesData) {
+          regionesData.forEach((r) => {
+            regionsCache.current.set(r.id, r.nombre_region);
+          });
+        }
+      }
+
+      // ✅ 3. Cargar vehículo
+      const { data: vehiculoData, error: vehiculoError } = await supabase
+        .from("vehiculo")
+        .select("*")
+        .eq("id", parseInt(vehicleId))
+        .single();
+
+      if (vehiculoError || !vehiculoData) {
+        throw vehiculoError || new Error("Vehículo no encontrado");
+      }
+
+      console.log("✅ Vehículo cargado:", vehiculoData);
+      console.log("📋 usuario_id:", vehiculoData.usuario_id);
+      console.log("📋 correo_dueno:", vehiculoData.correo_dueno);
+
+      // ✅ 4. Cargar tipos e imágenes
+      const [
+        { data: combustibleData },
+        { data: tipoVehiculoData },
+        { data: imagenesData },
+      ] = await Promise.all([
+        vehiculoData.tipo_combustible_id
+          ? supabase
+              .from("tipo_combustible")
+              .select("nombre")
+              .eq("id", vehiculoData.tipo_combustible_id)
+              .single()
+          : Promise.resolve({ data: null }),
+        vehiculoData.tipo_vehiculo_id
+          ? supabase
+              .from("tipo_vehiculo")
+              .select("nombre")
+              .eq("id", vehiculoData.tipo_vehiculo_id)
+              .single()
+          : Promise.resolve({ data: null }),
+        supabase
+          .from("imagen_vehiculo")
+          .select("url_imagen")
+          .eq("vehiculo_id", parseInt(vehicleId))
+          .order("id", { ascending: true }),
+      ]);
+
+      const vehicleDetail: VehicleDetail = {
+        ...vehiculoData,
+        images:
+          imagenesData
+            ?.map((img) => img.url_imagen)
+            .filter((url) => url && url.trim() !== "") || [],
+        tipo_combustible: combustibleData?.nombre || "Desconocido",
+        tipo_vehiculo: tipoVehiculoData?.nombre || "Desconocido",
+      };
+
+      setVehicle(vehicleDetail);
+
+      // ✅ 5. Verificar favoritos
+      if (session?.user?.id) {
         await checkIfFavorite(session.user.id);
       }
 
-      // Cargar vehículo
-      const { data: vehicleData, error: vehicleError } = await supabase
-        .from("vehicle_publications")
-        .select("*")
-        .eq("id", vehicleId)
-        .single();
+      // ✅ 6. Cargar vendedor
+      console.log("📥 ========== BUSCANDO VENDEDOR ==========");
 
-      if (vehicleError) throw vehicleError;
-      setVehicle(vehicleData);
+      // OPCIÓN 1: Si vehiculo tiene usuario_id (usuario regular)
+      if (vehiculoData.usuario_id) {
+        console.log(
+          "🔍 Opción 1: Buscando usuario con usuario_id:",
+          vehiculoData.usuario_id
+        );
 
-      // Cargar perfil del vendedor (usuario o empresa)
-      // Primero intentar cargar como perfil de usuario
-      const { data: profileData, error: profileError } = await supabase
-        .from("profiles")
-        .select("full_name, username, phone, region, city")
-        .eq("id", vehicleData.user_id)
-        .single();
-
-      if (!profileError && profileData) {
-        // Es un usuario normal
-        setSeller({
-          ...profileData,
-          is_company: false
-        });
-      } else {
-        // Si no es un usuario, intentar cargar como empresa
-        const { data: businessData, error: businessError } = await supabase
-          .from("business_profiles")
-          .select("commercial_name, phone, region, city")
-          .eq("id", vehicleData.user_id)
+        const { data: usuarioData, error: usuarioError } = await supabase
+          .from("usuario")
+          .select("nombre, apellido, correo_electronico, telefono, region")
+          .eq("id", vehiculoData.usuario_id)
           .single();
 
-        if (!businessError && businessData) {
-          // Es una empresa - adaptamos los datos al formato SellerProfile
+        console.log("❌ usuario error:", usuarioError);
+        console.log("✅ usuario data:", usuarioData);
+
+        if (!usuarioError && usuarioData) {
+          const regionName =
+            regionsCache.current.get(usuarioData.region) || "Desconocida";
+
           setSeller({
-            full_name: businessData.commercial_name,
-            username: businessData.commercial_name.toLowerCase().replace(/\s+/g, '_'),
-            phone: businessData.phone,
-            region: businessData.region,
-            city: businessData.city,
-            is_company: true, // Lo establecemos aquí, no viene de la BD
-            company_name: businessData.commercial_name,
+            nombre: usuarioData.nombre || "",
+            apellido: usuarioData.apellido || "",
+            correo_electronico: usuarioData.correo_electronico || "",
+            telefono: usuarioData.telefono,
+            region_nombre: regionName,
           });
-        } else if (businessError) {
-          // Debug: Ver el error exacto
-          console.error("Error al cargar business_profile:", businessError);
-          console.log("Código de error:", businessError.code);
-          console.log("Mensaje:", businessError.message);
+          console.log("✅ VENDEDOR CARGADO (usuario)");
+          return;
         }
       }
+
+      // OPCIÓN 2: Si vehiculo tiene correo_dueno, buscar en usuario
+      if (vehiculoData.correo_dueno) {
+        console.log(
+          "🔍 Opción 2: Buscando usuario por correo_dueno:",
+          vehiculoData.correo_dueno
+        );
+
+        const { data: usuarioData, error: usuarioError } = await supabase
+          .from("usuario")
+          .select("nombre, apellido, correo_electronico, telefono, region")
+          .eq("correo_electronico", vehiculoData.correo_dueno)
+          .single();
+
+        console.log("❌ usuario por correo error:", usuarioError);
+        console.log("✅ usuario por correo data:", usuarioData);
+
+        if (!usuarioError && usuarioData) {
+          const regionName =
+            regionsCache.current.get(usuarioData.region) || "Desconocida";
+
+          setSeller({
+            nombre: usuarioData.nombre || "",
+            apellido: usuarioData.apellido || "",
+            correo_electronico: usuarioData.correo_electronico || "",
+            telefono: usuarioData.telefono,
+            region_nombre: regionName,
+          });
+          console.log("✅ VENDEDOR CARGADO (usuario por correo)");
+          return;
+        }
+
+        // OPCIÓN 3: Si no está en usuario, buscar en empresa
+        console.log(
+          "🔍 Opción 3: Buscando empresa con correo:",
+          vehiculoData.correo_dueno
+        );
+
+        const { data: empresaData, error: empresaError } = await supabase
+          .from("empresa")
+          .select(
+            "nombre_comercial, correo_electronico, telefono, ciudad, region"
+          )
+          .eq("correo_electronico", vehiculoData.correo_dueno)
+          .single();
+
+        console.log("❌ empresa error:", empresaError);
+        console.log("✅ empresa data:", empresaData);
+
+        if (!empresaError && empresaData) {
+          const regionName = empresaData.region
+            ? regionsCache.current.get(empresaData.region) ||
+              empresaData.ciudad ||
+              "Desconocida"
+            : empresaData.ciudad || "Desconocida";
+
+          setSeller({
+            nombre: empresaData.nombre_comercial || "",
+            apellido: "",
+            correo_electronico: empresaData.correo_electronico || "",
+            telefono: empresaData.telefono,
+            region_nombre: regionName,
+          });
+          console.log("✅ VENDEDOR CARGADO (empresa)");
+          return;
+        }
+      }
+
+      console.log("⚠️ No se encontró vendedor");
+      setSeller(null);
     } catch (error: any) {
-      console.error("Error loading vehicle:", error);
+      console.error("❌ Error cargando detalles:", error);
+      setError(error.message || "Error al cargar el vehículo");
     } finally {
       setLoading(false);
     }
-  };
+  }, [vehicleId]);
 
-  const checkIfFavorite = async (userId: string) => {
+  const checkIfFavorite = useCallback(
+    async (userId: string) => {
+      try {
+        const { data, error } = await supabase
+          .from("favorito")
+          .select("id")
+          .eq("usuario_id", userId)
+          .eq("vehiculo_id", parseInt(vehicleId))
+          .single();
+
+        if (error && error.code !== "PGRST116") {
+          console.error("Error checking favorite:", error);
+        }
+
+        setIsFavorite(!!data);
+      } catch (error: any) {
+        console.error("Error checking favorite:", error);
+      }
+    },
+    [vehicleId]
+  );
+
+  const toggleFavorite = useCallback(async () => {
+    if (!user) {
+      alert("Debes iniciar sesión para agregar favoritos");
+      router.push("/login");
+      return;
+    }
+
     try {
-      const { data, error } = await supabase
-        .from("favorites")
-        .select("id")
-        .eq("user_id", userId)
-        .eq("vehicle_id", vehicleId)
-        .single();
+      if (isFavorite) {
+        const { error } = await supabase
+          .from("favorito")
+          .delete()
+          .eq("usuario_id", user.id)
+          .eq("vehiculo_id", parseInt(vehicleId));
 
-      if (error && error.code !== "PGRST116") throw error;
-      setIsFavorite(!!data);
+        if (error) throw error;
+        setIsFavorite(false);
+      } else {
+        const { error } = await supabase.from("favorito").insert({
+          usuario_id: user.id,
+          vehiculo_id: parseInt(vehicleId),
+        });
+
+        if (error) throw error;
+        setIsFavorite(true);
+      }
     } catch (error: any) {
-      console.error("Error checking favorite:", error);
+      console.error("Error toggling favorite:", error);
+      setError(`Error al actualizar favoritos: ${error.message}`);
     }
-  };
+  }, [user, vehicleId, isFavorite]);
 
-  const toggleFavorite = async () => {
-  if (!user) {
-    alert("Debes iniciar sesión para agregar favoritos");
-    router.push("/login");
-    return;
-  }
-
-  try {
-    if (isFavorite) {
-      // Eliminar favorito
-      const { error: deleteError } = await supabase
-        .from("favorites")
-        .delete()
-        .eq("user_id", user.id)
-        .eq("vehicle_id", vehicleId);
-
-      if (deleteError) throw deleteError;
-      setIsFavorite(false);
-    } else {
-      // Agregar favorito con SELECT para obtener el FK
-      const { data: insertData, error: insertError } = await supabase
-        .from("favorites")
-        .insert({
-          user_id: user.id,
-          vehicle_id: vehicleId,
-        })
-        .select(`*, fk_vehicle(*)`)
-        .single();
-
-      if (insertError) throw insertError;
-
-      setIsFavorite(true);
-      console.log("Favorito agregado:", insertData);
-    }
-  } catch (error: any) {
-    console.error("Error toggling favorite:", error);
-    alert(`Error al actualizar favoritos: ${error.message || JSON.stringify(error)}`);
-  }
-};
-
-
-  const formatPrice = (price: number) => {
+  const formatPrice = useCallback((price: number) => {
     return new Intl.NumberFormat("es-CL", {
       style: "currency",
       currency: "CLP",
       minimumFractionDigits: 0,
     }).format(price);
-  };
+  }, []);
 
-  const formatDate = (dateString: string) => {
+  const formatDate = useCallback((dateString: string) => {
     return new Date(dateString).toLocaleDateString("es-ES", {
       year: "numeric",
       month: "long",
       day: "numeric",
     });
-  };
+  }, []);
 
-  const nextImage = () => {
+  const nextImage = useCallback(() => {
     if (vehicle && vehicle.images.length > 0) {
       setCurrentImageIndex((prev) =>
         prev === vehicle.images.length - 1 ? 0 : prev + 1
       );
     }
-  };
+  }, [vehicle?.images.length]);
 
-  const prevImage = () => {
+  const prevImage = useCallback(() => {
     if (vehicle && vehicle.images.length > 0) {
       setCurrentImageIndex((prev) =>
         prev === 0 ? vehicle.images.length - 1 : prev - 1
       );
     }
-  };
+  }, [vehicle?.images.length]);
 
-  const handleShare = async () => {
+  const handleShare = useCallback(async () => {
+    if (!vehicle) return;
+
     if (navigator.share) {
       try {
         await navigator.share({
-          title: `${vehicle?.brand} ${vehicle?.model}`,
-          text: `Mira este ${vehicle?.brand} ${vehicle?.model} ${vehicle?.year}`,
+          title: `${vehicle.marca} ${vehicle.modelo}`,
+          text: `Mira este ${vehicle.marca} ${vehicle.modelo} ${vehicle.anio}`,
           url: window.location.href,
         });
       } catch (error) {
         console.log("Error sharing:", error);
       }
     } else {
-      // Fallback: copiar al portapapeles
       navigator.clipboard.writeText(window.location.href);
       alert("Enlace copiado al portapapeles");
     }
-  };
+  }, [vehicle]);
+
+  // ✅ Memoizar región del vehículo
+  const vehicleRegion = useMemo(() => {
+    if (!vehicle) return "Desconocida";
+    return regionsCache.current.get(vehicle.region) || "Desconocida";
+  }, [vehicle?.region]);
 
   if (loading) {
     return (
@@ -277,7 +428,7 @@ export default function VehicleDetailPage() {
             Vehículo no encontrado
           </h2>
           <p className="text-gray-600 mb-6">
-            El vehículo que buscas no existe o ha sido eliminado
+            {error || "El vehículo que buscas no existe o ha sido eliminado"}
           </p>
           <button
             onClick={() => router.push("/shop")}
@@ -302,6 +453,13 @@ export default function VehicleDetailPage() {
           Volver
         </button>
 
+        {error && (
+          <div className="mb-6 bg-yellow-100 border border-yellow-500 text-yellow-700 px-4 py-3 rounded-lg flex items-center gap-2">
+            <AlertCircle className="w-5 h-5 flex-shrink-0" />
+            {error}
+          </div>
+        )}
+
         <div className="grid lg:grid-cols-3 gap-6">
           {/* Main Content - Left Side */}
           <div className="lg:col-span-2 space-y-6">
@@ -310,11 +468,18 @@ export default function VehicleDetailPage() {
               {vehicle.images && vehicle.images.length > 0 ? (
                 <div className="relative">
                   <div className="relative h-96 bg-gray-200">
-                    <img
-                      src={vehicle.images[currentImageIndex]}
-                      alt={`${vehicle.brand} ${vehicle.model}`}
-                      className="w-full h-full object-cover"
-                    />
+                    {!imageErrors.has(currentImageIndex) ? (
+                      <img
+                        src={vehicle.images[currentImageIndex]}
+                        alt={`${vehicle.marca} ${vehicle.modelo}`}
+                        className="w-full h-full object-cover"
+                        onError={() => handleImageError(currentImageIndex)}
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center bg-gray-200">
+                        <Car className="w-24 h-24 text-gray-400" />
+                      </div>
+                    )}
 
                     {vehicle.images.length > 1 && (
                       <>
@@ -356,6 +521,10 @@ export default function VehicleDetailPage() {
                             src={image}
                             alt={`Thumbnail ${index + 1}`}
                             className="w-full h-full object-cover"
+                            onError={(e) => {
+                              (e.currentTarget as HTMLImageElement).src =
+                                "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100'%3E%3Crect fill='%23f3f4f6' width='100' height='100'/%3E%3C/svg%3E";
+                            }}
                           />
                         </button>
                       ))}
@@ -374,25 +543,27 @@ export default function VehicleDetailPage() {
               <div className="flex items-start justify-between mb-4">
                 <div>
                   <h1 className="text-3xl font-bold text-gray-800 mb-2">
-                    {vehicle.brand} {vehicle.model}
+                    {vehicle.marca} {vehicle.modelo}
                   </h1>
                   <p className="text-4xl font-bold text-indigo-600 mb-2">
-                    {formatPrice(vehicle.price)}
+                    {formatPrice(vehicle.precio)}
                   </p>
-                  {vehicle.condition && (
+                  {vehicle.estado_vehiculo && (
                     <span
                       className={`inline-block px-4 py-1 rounded-full text-sm font-semibold ${
-                        vehicle.condition === "Nuevo (0km)"
+                        vehicle.estado_vehiculo === "Nuevo"
                           ? "bg-green-100 text-green-700"
-                          : vehicle.condition === "Seminuevo"
+                          : vehicle.estado_vehiculo === "Semi-nuevo"
                           ? "bg-blue-100 text-blue-700"
                           : "bg-gray-100 text-gray-700"
                       }`}
                     >
-                      {vehicle.condition}
+                      {vehicle.estado_vehiculo}
                     </span>
                   )}
                 </div>
+
+                {/* Botones de acción */}
                 <div className="flex gap-2">
                   <button
                     onClick={toggleFavorite}
@@ -409,12 +580,18 @@ export default function VehicleDetailPage() {
                       className={`w-6 h-6 ${isFavorite ? "fill-current" : ""}`}
                     />
                   </button>
+
                   <button
                     onClick={handleShare}
                     className="p-3 bg-gray-100 text-gray-600 rounded-full hover:bg-gray-200 transition-colors"
                   >
                     <Share2 className="w-6 h-6" />
                   </button>
+
+                  <ReportButton
+                    vehiculoId={vehicle.id}
+                    vehiculoInfo={`${vehicle.marca} ${vehicle.modelo} ${vehicle.anio}`}
+                  />
                 </div>
               </div>
 
@@ -425,7 +602,7 @@ export default function VehicleDetailPage() {
                   <div>
                     <p className="text-xs text-gray-600">Año</p>
                     <p className="font-semibold text-gray-800">
-                      {vehicle.year}
+                      {vehicle.anio}
                     </p>
                   </div>
                 </div>
@@ -435,7 +612,7 @@ export default function VehicleDetailPage() {
                   <div>
                     <p className="text-xs text-gray-600">Kilometraje</p>
                     <p className="font-semibold text-gray-800">
-                      {vehicle.mileage.toLocaleString()} km
+                      {vehicle.kilometraje.toLocaleString()} km
                     </p>
                   </div>
                 </div>
@@ -445,7 +622,7 @@ export default function VehicleDetailPage() {
                   <div>
                     <p className="text-xs text-gray-600">Transmisión</p>
                     <p className="font-semibold text-gray-800">
-                      {vehicle.transmission}
+                      {vehicle.transmision}
                     </p>
                   </div>
                 </div>
@@ -455,7 +632,7 @@ export default function VehicleDetailPage() {
                   <div>
                     <p className="text-xs text-gray-600">Combustible</p>
                     <p className="font-semibold text-gray-800">
-                      {vehicle.fuel_type}
+                      {vehicle.tipo_combustible}
                     </p>
                   </div>
                 </div>
@@ -465,17 +642,7 @@ export default function VehicleDetailPage() {
                   <div>
                     <p className="text-xs text-gray-600">Tipo de Vehículo</p>
                     <p className="font-semibold text-gray-800">
-                      {vehicle.vehicle_type}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-3 p-3 bg-pink-50 rounded-lg">
-                  <Palette className="w-5 h-5 text-pink-600" />
-                  <div>
-                    <p className="text-xs text-gray-600">Color</p>
-                    <p className="font-semibold text-gray-800">
-                      {vehicle.color}
+                      {vehicle.tipo_vehiculo}
                     </p>
                   </div>
                 </div>
@@ -485,9 +652,20 @@ export default function VehicleDetailPage() {
                   <div>
                     <p className="text-xs text-gray-600">Motor</p>
                     <p className="font-semibold text-gray-800">
-                      {vehicle.engine_size} cc
+                      {vehicle.cilindrada} cc
                     </p>
                   </div>
+                </div>
+              </div>
+
+              {/* Location */}
+              <div className="flex items-center gap-2 p-3 bg-gray-50 rounded-lg mb-6">
+                <MapPin className="w-5 h-5 text-gray-600" />
+                <div>
+                  <p className="text-xs text-gray-600">Ubicación</p>
+                  <p className="font-semibold text-gray-800">
+                    {vehicle.ciudad}, {vehicleRegion}
+                  </p>
                 </div>
               </div>
 
@@ -497,7 +675,7 @@ export default function VehicleDetailPage() {
                   Descripción
                 </h3>
                 <p className="text-gray-700 whitespace-pre-line leading-relaxed">
-                  {vehicle.description}
+                  {vehicle.descripcion}
                 </p>
               </div>
 
@@ -512,86 +690,85 @@ export default function VehicleDetailPage() {
           <div className="lg:col-span-1">
             <div className="bg-white rounded-2xl shadow-xl p-6 sticky top-24">
               <h3 className="text-xl font-bold text-gray-800 mb-4">
-                Información del {seller?.is_company ? "Vendedor" : "Vendedor"}
+                Información del Vendedor
               </h3>
 
-              {seller ? (
+              {seller && seller.nombre ? (
                 <div className="space-y-4">
-                  {/* Badge de tipo de vendedor */}
-                  {seller.is_company && (
-                    <div className="flex items-center justify-center gap-2 bg-gradient-to-r from-indigo-100 to-purple-100 p-2 rounded-lg">
-                      <Building2 className="w-5 h-5 text-indigo-600" />
-                      <span className="text-sm font-semibold text-indigo-700">
-                        Empresa Verificada
-                      </span>
-                    </div>
-                  )}
-
+                  {/* Nombre */}
                   <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
-                    {seller.is_company ? (
-                      <Building2 className="w-5 h-5 text-gray-600" />
-                    ) : (
-                      <User className="w-5 h-5 text-gray-600" />
-                    )}
+                    <User className="w-5 h-5 text-gray-600" />
                     <div>
-                      <p className="text-xs text-gray-600">
-                        {seller.is_company ? "Empresa" : "Nombre"}
-                      </p>
+                      <p className="text-xs text-gray-600">Nombre</p>
                       <p className="font-semibold text-gray-800">
-                        {seller.full_name}
+                        {seller.nombre}
+                        {seller.apellido && ` ${seller.apellido}`}
                       </p>
-                      {!seller.is_company && (
-                        <p className="text-sm text-gray-500">
-                          @{seller.username}
-                        </p>
-                      )}
                     </div>
                   </div>
 
-                  {seller.region && seller.city && (
+                  {/* Región */}
+                  {seller.region_nombre && (
                     <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
                       <MapPin className="w-5 h-5 text-gray-600" />
                       <div>
-                        <p className="text-xs text-gray-600">Ubicación</p>
+                        <p className="text-xs text-gray-600">Región</p>
                         <p className="font-semibold text-gray-800">
-                          {seller.city}, {seller.region}
+                          {seller.region_nombre}
                         </p>
                       </div>
                     </div>
                   )}
 
-                  {/* Botón para ver perfil */}
-                  <button
-                    onClick={() =>
-                      router.push(`/seller-profile/${vehicle.user_id}`)
-                    }
-                    className="w-full flex items-center justify-center gap-2 bg-gray-100 text-gray-800 py-3 rounded-xl hover:bg-gray-200 transition-all font-semibold border border-gray-300"
-                  >
-                    {seller.is_company ? (
-                      <Building2 className="w-5 h-5" />
-                    ) : (
-                      <User className="w-5 h-5" />
-                    )}
-                    Ver Perfil del {seller.is_company ? "Empresa" : "Vendedor"}
-                  </button>
+                  {/* Teléfono */}
+                  {seller.telefono && (
+                    <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
+                      <Phone className="w-5 h-5 text-gray-600" />
+                      <div>
+                        <p className="text-xs text-gray-600">Teléfono</p>
+                        <p className="font-semibold text-gray-800">
+                          {seller.telefono}
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Email */}
+                  {seller.correo_electronico && (
+                    <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
+                      <Mail className="w-5 h-5 text-gray-600" />
+                      <div>
+                        <p className="text-xs text-gray-600">Email</p>
+                        <p className="font-semibold text-gray-800 truncate text-sm">
+                          {seller.correo_electronico}
+                        </p>
+                      </div>
+                    </div>
+                  )}
 
                   <button
                     onClick={() => setShowContactModal(true)}
                     className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-indigo-600 to-purple-600 text-white py-4 rounded-xl hover:shadow-lg transition-all font-bold text-lg"
                   >
                     <Phone className="w-5 h-5" />
-                    Contactar {seller.is_company ? "Empresa" : "Vendedor"}
+                    Contactar Vendedor
                   </button>
 
                   <div className="text-center text-xs text-gray-500">
                     <CheckCircle className="w-4 h-4 inline mr-1 text-green-500" />
-                    {seller.is_company ? "Empresa verificada" : "Vendedor verificado"}
+                    Vendedor verificado
                   </div>
                 </div>
               ) : (
-                <p className="text-gray-600">
-                  Cargando información del vendedor...
-                </p>
+                <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                  <p className="text-sm text-yellow-800">
+                    ℹ️ Cargando información del vendedor...
+                  </p>
+                  <div className="mt-2 flex gap-2">
+                    <div className="h-4 bg-yellow-200 rounded animate-pulse flex-1"></div>
+                    <div className="h-4 bg-yellow-200 rounded animate-pulse flex-1"></div>
+                  </div>
+                </div>
               )}
             </div>
           </div>
@@ -603,7 +780,7 @@ export default function VehicleDetailPage() {
             <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-6">
               <div className="flex justify-between items-center mb-4">
                 <h3 className="text-2xl font-bold text-gray-800">
-                  Contactar {seller.is_company ? "Empresa" : "Vendedor"}
+                  Contactar Vendedor
                 </h3>
                 <button
                   onClick={() => setShowContactModal(false)}
@@ -616,55 +793,52 @@ export default function VehicleDetailPage() {
               <div className="space-y-4">
                 <div className="p-4 bg-indigo-50 rounded-lg">
                   <div className="flex items-center gap-3 mb-2">
-                    {seller.is_company ? (
-                      <Building2 className="w-5 h-5 text-indigo-600" />
-                    ) : (
-                      <User className="w-5 h-5 text-indigo-600" />
-                    )}
+                    <User className="w-5 h-5 text-indigo-600" />
                     <p className="font-semibold text-gray-800">
-                      {seller.full_name}
+                      {seller.nombre}
+                      {seller.apellido && ` ${seller.apellido}`}
                     </p>
                   </div>
-                  {!seller.is_company && (
-                    <p className="text-sm text-gray-600">@{seller.username}</p>
-                  )}
-                  {seller.is_company && (
-                    <p className="text-sm text-gray-600">Empresa Verificada</p>
+                  {seller.region_nombre && (
+                    <p className="text-sm text-gray-600">
+                      {seller.region_nombre}
+                    </p>
                   )}
                 </div>
 
-                {seller.phone && (
-                  <a
-                    href={`tel:${seller.phone}`}
-                    className="flex items-center gap-3 p-4 bg-green-50 hover:bg-green-100 rounded-lg transition-colors"
-                  >
-                    <Phone className="w-5 h-5 text-green-600" />
-                    <div>
-                      <p className="text-xs text-gray-600">Teléfono</p>
-                      <p className="font-semibold text-gray-800">
-                        {seller.phone}
-                      </p>
-                    </div>
-                  </a>
+                {seller.telefono && (
+                  <>
+                    <a
+                      href={`tel:${seller.telefono}`}
+                      className="flex items-center gap-3 p-4 bg-green-50 hover:bg-green-100 rounded-lg transition-colors"
+                    >
+                      <Phone className="w-5 h-5 text-green-600" />
+                      <div>
+                        <p className="text-xs text-gray-600">Teléfono</p>
+                        <p className="font-semibold text-gray-800">
+                          {seller.telefono}
+                        </p>
+                      </div>
+                    </a>
+
+                    <a
+                      href={`https://wa.me/${seller.telefono
+                        .replace(/\+/g, "")
+                        .replace(/\s/g, "")}?text=Hola, me interesa tu ${
+                        vehicle.marca
+                      } ${vehicle.modelo} ${vehicle.anio}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="w-full flex items-center justify-center gap-2 bg-green-500 text-white py-3 rounded-lg hover:bg-green-600 transition-colors font-semibold"
+                    >
+                      <Phone className="w-5 h-5" />
+                      Contactar por WhatsApp
+                    </a>
+                  </>
                 )}
 
-                <a
-                  href={`https://wa.me/${seller.phone?.replace(
-                    /\+/g,
-                    ""
-                  )}?text=Hola, me interesa tu ${vehicle.brand} ${
-                    vehicle.model
-                  } ${vehicle.year}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="w-full flex items-center justify-center gap-2 bg-green-500 text-white py-3 rounded-lg hover:bg-green-600 transition-colors font-semibold"
-                >
-                  <Phone className="w-5 h-5" />
-                  Contactar por WhatsApp
-                </a>
-
                 <p className="text-xs text-center text-gray-500">
-                  Al contactar al {seller.is_company ? "empresa" : "vendedor"}, asegúrate de verificar la
+                  Al contactar al vendedor, asegúrate de verificar la
                   información del vehículo antes de realizar cualquier
                   transacción.
                 </p>

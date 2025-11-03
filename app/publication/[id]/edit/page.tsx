@@ -11,7 +11,6 @@ import {
   Calendar,
   Gauge,
   Fuel,
-  Palette,
   Wrench,
   FileText,
   Save,
@@ -20,33 +19,44 @@ import {
   Loader2,
   CheckCircle,
   AlertCircle,
+  MapPin,
+  User,
 } from "lucide-react";
 
-interface VehicleData {
-  price: string;
-  brand: string;
-  model: string;
-  year: string;
-  mileage: string;
-  transmission: string;
-  fuel_type: string;
-  color: string;
-  engine_size: string;
-  description: string;
-  condition: string;
-  images: string[];
-  vehicle_type: string;
+interface VehicleFormData {
+  marca: string;
+  modelo: string;
+  anio: string;
+  kilometraje: string;
+  transmision: string;
+  precio: string;
+  estado_vehiculo: string;
+  descripcion: string;
+  cilindrada: string;
+  tipo_vehiculo_id: string;
+  tipo_combustible_id: string;
+  region_id: string;
+  ciudad: string;
 }
 
-const FUEL_TYPES = ["Gasolina", "Diésel", "Eléctrico", "Híbrido"];
-const TRANSMISSIONS = ["Manual", "Automática", "Semi-automática"];
-const CONDITIONS = ["Nuevo (0km)", "Seminuevo", "Usado"];
-const VEHICLE_TYPES = ['Hatchback', 'Sedán', 'Coupé', 'SUV', 'Deportivo', 'Pick Up'];
+interface CatalogItem {
+  id: number;
+  nombre: string;
+}
+
+interface Region {
+  id: number;
+  nombre_region: string;
+  codigo_iso: string;
+}
+
+const TRANSMISSIONS = ["Manual", "Automática", "Semi-automática", "CVT"];
+const CONDITIONS = ["Nuevo", "Usado", "Semi-nuevo", "Para reparar"];
 
 export default function EditPublicationPage() {
   const router = useRouter();
   const params = useParams();
-  const publicationId = params?.id as string;
+  const vehicleId = params?.id as string;
 
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -54,22 +64,27 @@ export default function EditPublicationPage() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
 
-  const [vehicleData, setVehicleData] = useState<VehicleData>({
-    price: "",
-    brand: "",
-    model: "",
-    year: "",
-    mileage: "",
-    transmission: "",
-    fuel_type: "",
-    color: "",
-    engine_size: "",
-    description: "",
-    condition: "",
-    images: [],
-    vehicle_type: ''
+  const [tiposVehiculo, setTiposVehiculo] = useState<CatalogItem[]>([]);
+  const [tiposCombustible, setTiposCombustible] = useState<CatalogItem[]>([]);
+  const [regions, setRegions] = useState<Region[]>([]);
+
+  const [vehicleData, setVehicleData] = useState<VehicleFormData>({
+    marca: "",
+    modelo: "",
+    anio: "",
+    kilometraje: "",
+    transmision: "",
+    precio: "",
+    estado_vehiculo: "",
+    descripcion: "",
+    cilindrada: "",
+    tipo_vehiculo_id: "",
+    tipo_combustible_id: "",
+    region_id: "",
+    ciudad: "",
   });
 
+  const [existingImages, setExistingImages] = useState<string[]>([]);
   const [newImages, setNewImages] = useState<File[]>([]);
   const [newImagePreviews, setNewImagePreviews] = useState<string[]>([]);
   const [imagesToDelete, setImagesToDelete] = useState<string[]>([]);
@@ -80,62 +95,102 @@ export default function EditPublicationPage() {
         data: { session },
       } = await supabase.auth.getSession();
 
-      if (!session) {
+      if (!session?.user?.id) {
         router.push("/login");
         return;
       }
 
       setUser(session.user);
-      await loadPublication(session.user.id);
+      await loadCatalogs();
+      await loadVehicle(session.user.id);
       setLoading(false);
     };
 
     checkAuthAndLoad();
-  }, [publicationId, router]);
+  }, [vehicleId, router]);
 
-  const loadPublication = async (userId: string) => {
+  const loadCatalogs = async () => {
     try {
-      const { data, error } = await supabase
-        .from("vehicle_publications")
-        .select("*")
-        .eq("id", publicationId)
+      const { data: tiposData } = await supabase
+        .from("tipo_vehiculo")
+        .select("id, nombre")
+        .order("nombre");
+      setTiposVehiculo(tiposData || []);
+
+      const { data: combustibleData } = await supabase
+        .from("tipo_combustible")
+        .select("id, nombre")
+        .order("nombre");
+      setTiposCombustible(combustibleData || []);
+
+      const { data: regionesData } = await supabase
+        .from("region")
+        .select("id, nombre_region, codigo_iso")
+        .order("nombre_region");
+      setRegions(regionesData || []);
+    } catch (error: any) {
+      console.error("Error cargando catálogos:", error);
+      setError("Error al cargar los catálogos");
+    }
+  };
+
+  const loadVehicle = async (userId: string) => {
+    try {
+      // Verificar que el usuario sea dueño del vehículo
+      const { data: ownerData } = await supabase
+        .from("usuario_vehiculo")
+        .select("usuario_id")
+        .eq("vehiculo_id", parseInt(vehicleId))
         .single();
 
-      if (error) throw error;
-
-      // Verificar que el usuario sea el propietario
-      if (data.user_id !== userId) {
-        setError("No tienes permiso para editar esta publicación");
-        setTimeout(() => router.push("/mypost"), 2000);
+      if (!ownerData || ownerData.usuario_id !== userId) {
+        setError("No tienes permiso para editar este vehículo");
+        setTimeout(() => router.push("/profile"), 2000);
         return;
       }
 
-      // Cargar datos
+      // Cargar datos del vehículo
+      const { data: vehiculoData, error: vehiculoError } = await supabase
+        .from("vehiculo")
+        .select("*")
+        .eq("id", parseInt(vehicleId))
+        .single();
+
+      if (vehiculoError) throw vehiculoError;
+
       setVehicleData({
-        price: data.price.toString(),
-        brand: data.brand,
-        model: data.model,
-        year: data.year.toString(),
-        mileage: data.mileage.toString(),
-        transmission: data.transmission,
-        fuel_type: data.fuel_type,
-        color: data.color,
-        engine_size: data.engine_size.toString(),
-        description: data.description,
-        condition: data.condition || "",
-        images: data.images || [],
-        vehicle_type: data.vehicle_type || ''
+        marca: vehiculoData.marca,
+        modelo: vehiculoData.modelo,
+        anio: vehiculoData.anio.toString(),
+        kilometraje: vehiculoData.kilometraje.toString(),
+        transmision: vehiculoData.transmision,
+        precio: vehiculoData.precio.toString(),
+        estado_vehiculo: vehiculoData.estado_vehiculo,
+        descripcion: vehiculoData.descripcion,
+        cilindrada: vehiculoData.cilindrada,
+        tipo_vehiculo_id: vehiculoData.tipo_vehiculo_id?.toString() || "",
+        tipo_combustible_id: vehiculoData.tipo_combustible_id?.toString() || "",
+        region_id: vehiculoData.region?.toString() || "",
+        ciudad: vehiculoData.ciudad || "",
       });
+
+      // Cargar imágenes existentes
+      const { data: imagenesData } = await supabase
+        .from("imagen_vehiculo")
+        .select("url_imagen")
+        .eq("vehiculo_id", parseInt(vehicleId));
+
+      setExistingImages(imagenesData?.map((img) => img.url_imagen) || []);
     } catch (error: any) {
-      console.error("Error loading publication:", error);
-      setError("Error al cargar la publicación");
+      console.error("Error loading vehicle:", error);
+      setError("Error al cargar el vehículo");
     }
   };
 
   const handleNewImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
     const totalImages =
-      vehicleData.images.length -
+      existingImages.length -
       imagesToDelete.length +
       newImages.length +
       files.length;
@@ -153,19 +208,17 @@ export default function EditPublicationPage() {
     setError("");
   };
 
-  const removeExistingImage = (imageUrl: string) => {
-    setImagesToDelete([...imagesToDelete, imageUrl]);
+  const removeExistingImage = (url: string) => {
+    setImagesToDelete([...imagesToDelete, url]);
   };
 
-  const undoRemoveImage = (imageUrl: string) => {
-    setImagesToDelete(imagesToDelete.filter((url) => url !== imageUrl));
+  const undoRemoveImage = (url: string) => {
+    setImagesToDelete(imagesToDelete.filter((u) => u !== url));
   };
 
   const removeNewImage = (index: number) => {
-    const newImgs = newImages.filter((_, i) => i !== index);
-    const newPrevs = newImagePreviews.filter((_, i) => i !== index);
-    setNewImages(newImgs);
-    setNewImagePreviews(newPrevs);
+    setNewImages(newImages.filter((_, i) => i !== index));
+    setNewImagePreviews(newImagePreviews.filter((_, i) => i !== index));
   };
 
   const handleSubmit = async () => {
@@ -173,45 +226,72 @@ export default function EditPublicationPage() {
 
     // Validaciones
     if (
-      !vehicleData.price ||
-      !vehicleData.brand ||
-      !vehicleData.model ||
-      !vehicleData.year ||
-      !vehicleData.mileage ||
-      !vehicleData.transmission ||
-      !vehicleData.fuel_type ||
-      !vehicleData.color ||
-      !vehicleData.engine_size ||
-      !vehicleData.description ||
-      !vehicleData.condition ||
-      !vehicleData.vehicle_type
+      !vehicleData.marca.trim() ||
+      !vehicleData.modelo.trim() ||
+      !vehicleData.precio ||
+      !vehicleData.anio ||
+      !vehicleData.kilometraje ||
+      !vehicleData.transmision ||
+      !vehicleData.tipo_combustible_id ||
+      !vehicleData.cilindrada ||
+      !vehicleData.descripcion.trim() ||
+      !vehicleData.estado_vehiculo ||
+      !vehicleData.tipo_vehiculo_id ||
+      !vehicleData.ciudad.trim() ||
+      !vehicleData.region_id
     ) {
       setError("Por favor completa todos los campos obligatorios");
       return;
     }
 
-    const remainingImages = vehicleData.images.filter(
-      (img) => !imagesToDelete.includes(img)
-    );
-    if (remainingImages.length + newImages.length === 0) {
+    const remainingImages = existingImages.length - imagesToDelete.length;
+    if (remainingImages + newImages.length === 0) {
       setError("Debes tener al menos una imagen del vehículo");
-      return;
-    }
-
-    if (
-      parseInt(vehicleData.year) < 1900 ||
-      parseInt(vehicleData.year) > new Date().getFullYear() + 1
-    ) {
-      setError("El año del vehículo no es válido");
       return;
     }
 
     setSaving(true);
 
     try {
-      // Subir nuevas imágenes
-      const newImageUrls: string[] = [];
+      // 1. Actualizar vehículo
+      const { error: vehicleError } = await supabase
+        .from("vehiculo")
+        .update({
+          marca: vehicleData.marca.trim(),
+          modelo: vehicleData.modelo.trim(),
+          anio: parseInt(vehicleData.anio),
+          kilometraje: parseInt(vehicleData.kilometraje),
+          transmision: vehicleData.transmision,
+          precio: parseFloat(vehicleData.precio),
+          estado_vehiculo: vehicleData.estado_vehiculo,
+          descripcion: vehicleData.descripcion.trim(),
+          cilindrada: vehicleData.cilindrada,
+          tipo_vehiculo_id: parseInt(vehicleData.tipo_vehiculo_id),
+          tipo_combustible_id: parseInt(vehicleData.tipo_combustible_id),
+          region: parseInt(vehicleData.region_id),
+          ciudad: vehicleData.ciudad.trim(),
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", parseInt(vehicleId));
 
+      if (vehicleError) throw vehicleError;
+
+      // 2. Eliminar imágenes marcadas
+      for (const url of imagesToDelete) {
+        await supabase
+          .from("imagen_vehiculo")
+          .delete()
+          .eq("vehiculo_id", parseInt(vehicleId))
+          .eq("url_imagen", url);
+
+        // También eliminar del storage
+        const fileName = url.split("/").pop();
+        if (fileName) {
+          await supabase.storage.from("vehiculo_imagen").remove([fileName]);
+        }
+      }
+
+      // 3. Subir nuevas imágenes
       for (let i = 0; i < newImages.length; i++) {
         const file = newImages[i];
         const fileName = `${user.id}/${Date.now()}_${i}.${file.name
@@ -219,61 +299,27 @@ export default function EditPublicationPage() {
           .pop()}`;
 
         const { error: uploadError } = await supabase.storage
-          .from("vehicle-images")
+          .from("vehiculo_imagen")
           .upload(fileName, file);
 
         if (uploadError) throw uploadError;
 
-        const {
-          data: { publicUrl },
-        } = supabase.storage.from("vehicle-images").getPublicUrl(fileName);
+        const { data: publicData } = supabase.storage
+          .from("vehiculo_imagen")
+          .getPublicUrl(fileName);
 
-        newImageUrls.push(publicUrl);
+        await supabase.from("imagen_vehiculo").insert({
+          vehiculo_id: parseInt(vehicleId),
+          url_imagen: publicData.publicUrl,
+        });
       }
-
-      // Eliminar imágenes marcadas del storage
-      for (const imageUrl of imagesToDelete) {
-        try {
-          const fileName = imageUrl.split("/vehicle-images/")[1];
-          if (fileName) {
-            await supabase.storage.from("vehicle-images").remove([fileName]);
-          }
-        } catch (err) {
-          console.error("Error deleting image:", err);
-        }
-      }
-
-      // Combinar imágenes existentes (no eliminadas) con las nuevas
-      const finalImages = [...remainingImages, ...newImageUrls];
-
-      // Actualizar publicación en la base de datos
-      const { error: dbError } = await supabase
-        .from("vehicle_publications")
-        .update({
-          price: parseInt(vehicleData.price),
-          brand: vehicleData.brand,
-          model: vehicleData.model,
-          year: parseInt(vehicleData.year),
-          mileage: parseInt(vehicleData.mileage),
-          transmission: vehicleData.transmission,
-          fuel_type: vehicleData.fuel_type,
-          color: vehicleData.color,
-          engine_size: parseInt(vehicleData.engine_size),
-          description: vehicleData.description,
-          condition: vehicleData.condition,
-          images: finalImages,
-          updated_at: new Date().toISOString(),
-          vehicle_type: vehicleData.vehicle_type
-        })
-        .eq("id", publicationId);
-
-      if (dbError) throw dbError;
 
       setSuccess(true);
       setTimeout(() => {
         router.push("/mypost");
       }, 2000);
     } catch (error: any) {
+      console.error("Error:", error);
       setError("Error al actualizar el vehículo: " + error.message);
     } finally {
       setSaving(false);
@@ -285,7 +331,7 @@ export default function EditPublicationPage() {
       <div className="min-h-screen bg-gradient-to-br from-indigo-50 to-purple-100 flex items-center justify-center">
         <div className="text-center">
           <Loader2 className="w-12 h-12 text-indigo-600 animate-spin mx-auto mb-4" />
-          <p className="text-gray-600">Cargando publicación...</p>
+          <p className="text-gray-600">Cargando vehículo...</p>
         </div>
       </div>
     );
@@ -300,9 +346,8 @@ export default function EditPublicationPage() {
             ¡Actualización Exitosa!
           </h2>
           <p className="text-gray-600">
-            Tu publicación ha sido actualizada correctamente
+            Tu vehículo ha sido actualizado correctamente
           </p>
-          <Loader2 className="w-6 h-6 text-indigo-600 animate-spin mx-auto mt-4" />
         </div>
       </div>
     );
@@ -313,11 +358,11 @@ export default function EditPublicationPage() {
       <div className="max-w-4xl mx-auto">
         <div className="mb-6">
           <button
-            onClick={() => router.push("/mypost")}
+            onClick={() => router.back()}
             className="flex items-center gap-2 text-gray-600 hover:text-gray-900 transition-colors"
           >
             <ArrowLeft className="w-5 h-5" />
-            Volver a Mis Publicaciones
+            Volver
           </button>
         </div>
 
@@ -351,13 +396,12 @@ export default function EditPublicationPage() {
                 </label>
 
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-4">
-                  {/* Imágenes existentes */}
-                  {vehicleData.images.map((image, index) => {
-                    const isMarkedForDeletion = imagesToDelete.includes(image);
+                  {existingImages.map((url, index) => {
+                    const isMarkedForDeletion = imagesToDelete.includes(url);
                     return (
                       <div key={`existing-${index}`} className="relative group">
                         <img
-                          src={image}
+                          src={url}
                           alt={`Existente ${index + 1}`}
                           className={`w-full h-32 object-cover rounded-lg border-2 ${
                             isMarkedForDeletion
@@ -367,14 +411,16 @@ export default function EditPublicationPage() {
                         />
                         {isMarkedForDeletion ? (
                           <button
-                            onClick={() => undoRemoveImage(image)}
-                            className="absolute -top-2 -right-2 bg-green-500 text-white rounded-full p-1 transition-opacity"
+                            type="button"
+                            onClick={() => undoRemoveImage(url)}
+                            className="absolute -top-2 -right-2 bg-green-500 text-white rounded-full p-1"
                           >
                             <CheckCircle className="w-4 h-4" />
                           </button>
                         ) : (
                           <button
-                            onClick={() => removeExistingImage(image)}
+                            type="button"
+                            onClick={() => removeExistingImage(url)}
                             className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
                           >
                             <X className="w-4 h-4" />
@@ -384,7 +430,6 @@ export default function EditPublicationPage() {
                     );
                   })}
 
-                  {/* Nuevas imágenes */}
                   {newImagePreviews.map((preview, index) => (
                     <div key={`new-${index}`} className="relative group">
                       <img
@@ -396,6 +441,7 @@ export default function EditPublicationPage() {
                         Nueva
                       </div>
                       <button
+                        type="button"
                         onClick={() => removeNewImage(index)}
                         className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
                       >
@@ -404,8 +450,7 @@ export default function EditPublicationPage() {
                     </div>
                   ))}
 
-                  {/* Botón para subir nuevas */}
-                  {vehicleData.images.length -
+                  {existingImages.length -
                     imagesToDelete.length +
                     newImages.length <
                     6 && (
@@ -425,14 +470,13 @@ export default function EditPublicationPage() {
                   )}
                 </div>
                 <p className="text-xs text-gray-500">
-                  {vehicleData.images.length -
+                  {existingImages.length -
                     imagesToDelete.length +
                     newImages.length}
                   /6 imágenes
                 </p>
               </div>
 
-              {/* Información Básica */}
               <div className="border-t pt-6">
                 <h3 className="text-lg font-semibold text-gray-800 mb-4">
                   Información Básica
@@ -440,39 +484,20 @@ export default function EditPublicationPage() {
                 <div className="grid md:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                      <DollarSign className="w-4 h-4 inline mr-1" />
-                      Precio (CLP) *
-                    </label>
-                    <input
-                      type="number"
-                      value={vehicleData.price}
-                      onChange={(e) =>
-                        setVehicleData({
-                          ...vehicleData,
-                          price: e.target.value,
-                        })
-                      }
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                      placeholder="5000000"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
                       <Car className="w-4 h-4 inline mr-1" />
                       Marca *
                     </label>
                     <input
                       type="text"
-                      value={vehicleData.brand}
+                      value={vehicleData.marca}
                       onChange={(e) =>
                         setVehicleData({
                           ...vehicleData,
-                          brand: e.target.value,
+                          marca: e.target.value,
                         })
                       }
                       className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                      placeholder="Ej: Toyota, Chevrolet, Ford..."
+                      placeholder="Ej: Toyota, Ford, BMW..."
                     />
                   </div>
 
@@ -482,15 +507,35 @@ export default function EditPublicationPage() {
                     </label>
                     <input
                       type="text"
-                      value={vehicleData.model}
+                      value={vehicleData.modelo}
                       onChange={(e) =>
                         setVehicleData({
                           ...vehicleData,
-                          model: e.target.value,
+                          modelo: e.target.value,
                         })
                       }
                       className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                      placeholder="Corolla"
+                      placeholder="Ej: Corolla, Fiesta, X5..."
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      <DollarSign className="w-4 h-4 inline mr-1" />
+                      Precio (CLP) *
+                    </label>
+                    <input
+                      type="number"
+                      value={vehicleData.precio}
+                      onChange={(e) =>
+                        setVehicleData({
+                          ...vehicleData,
+                          precio: e.target.value,
+                        })
+                      }
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                      placeholder="5000000"
+                      min="0"
                     />
                   </div>
 
@@ -501,9 +546,9 @@ export default function EditPublicationPage() {
                     </label>
                     <input
                       type="number"
-                      value={vehicleData.year}
+                      value={vehicleData.anio}
                       onChange={(e) =>
-                        setVehicleData({ ...vehicleData, year: e.target.value })
+                        setVehicleData({ ...vehicleData, anio: e.target.value })
                       }
                       className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                       placeholder="2020"
@@ -519,15 +564,60 @@ export default function EditPublicationPage() {
                     </label>
                     <input
                       type="number"
-                      value={vehicleData.mileage}
+                      value={vehicleData.kilometraje}
                       onChange={(e) =>
                         setVehicleData({
                           ...vehicleData,
-                          mileage: e.target.value,
+                          kilometraje: e.target.value,
                         })
                       }
                       className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                       placeholder="50000"
+                      min="0"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      <Wrench className="w-4 h-4 inline mr-1" />
+                      Transmisión *
+                    </label>
+                    <select
+                      value={vehicleData.transmision}
+                      onChange={(e) =>
+                        setVehicleData({
+                          ...vehicleData,
+                          transmision: e.target.value,
+                        })
+                      }
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                    >
+                      <option value="">Selecciona</option>
+                      {TRANSMISSIONS.map((trans) => (
+                        <option key={trans} value={trans}>
+                          {trans}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      <Wrench className="w-4 h-4 inline mr-1" />
+                      Cilindrada (cc) *
+                    </label>
+                    <input
+                      type="number"
+                      value={vehicleData.cilindrada}
+                      onChange={(e) =>
+                        setVehicleData({
+                          ...vehicleData,
+                          cilindrada: e.target.value,
+                        })
+                      }
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                      placeholder="1800"
+                      min="0"
                     />
                   </div>
 
@@ -537,11 +627,11 @@ export default function EditPublicationPage() {
                       Estado *
                     </label>
                     <select
-                      value={vehicleData.condition}
+                      value={vehicleData.estado_vehiculo}
                       onChange={(e) =>
                         setVehicleData({
                           ...vehicleData,
-                          condition: e.target.value,
+                          estado_vehiculo: e.target.value,
                         })
                       }
                       className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
@@ -561,42 +651,19 @@ export default function EditPublicationPage() {
                       Tipo de Vehículo *
                     </label>
                     <select
-                      value={vehicleData.vehicle_type}
+                      value={vehicleData.tipo_vehiculo_id}
                       onChange={(e) =>
                         setVehicleData({
                           ...vehicleData,
-                          vehicle_type: e.target.value,
+                          tipo_vehiculo_id: e.target.value,
                         })
                       }
                       className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                     >
                       <option value="">Selecciona el tipo</option>
-                      {VEHICLE_TYPES.map((type) => (
-                        <option key={type} value={type}>
-                          {type}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Transmisión *
-                    </label>
-                    <select
-                      value={vehicleData.transmission}
-                      onChange={(e) =>
-                        setVehicleData({
-                          ...vehicleData,
-                          transmission: e.target.value,
-                        })
-                      }
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                    >
-                      <option value="">Selecciona</option>
-                      {TRANSMISSIONS.map((trans) => (
-                        <option key={trans} value={trans}>
-                          {trans}
+                      {tiposVehiculo.map((tipo) => (
+                        <option key={tipo.id} value={tipo.id.toString()}>
+                          {tipo.nombre}
                         </option>
                       ))}
                     </select>
@@ -608,19 +675,19 @@ export default function EditPublicationPage() {
                       Tipo de Combustible *
                     </label>
                     <select
-                      value={vehicleData.fuel_type}
+                      value={vehicleData.tipo_combustible_id}
                       onChange={(e) =>
                         setVehicleData({
                           ...vehicleData,
-                          fuel_type: e.target.value,
+                          tipo_combustible_id: e.target.value,
                         })
                       }
                       className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                     >
                       <option value="">Selecciona</option>
-                      {FUEL_TYPES.map((fuel) => (
-                        <option key={fuel} value={fuel}>
-                          {fuel}
+                      {tiposCombustible.map((tipo) => (
+                        <option key={tipo.id} value={tipo.id.toString()}>
+                          {tipo.nombre}
                         </option>
                       ))}
                     </select>
@@ -628,39 +695,44 @@ export default function EditPublicationPage() {
 
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                      <Palette className="w-4 h-4 inline mr-1" />
-                      Color *
+                      <MapPin className="w-4 h-4 inline mr-1" />
+                      Región *
                     </label>
-                    <input
-                      type="text"
-                      value={vehicleData.color}
+                    <select
+                      value={vehicleData.region_id}
                       onChange={(e) =>
                         setVehicleData({
                           ...vehicleData,
-                          color: e.target.value,
+                          region_id: e.target.value,
                         })
                       }
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                      placeholder="Negro"
-                    />
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent appearance-none cursor-pointer bg-white"
+                    >
+                      <option value="">Selecciona una región</option>
+                      {regions.map((region) => (
+                        <option key={region.id} value={region.id.toString()}>
+                          {region.nombre_region} ({region.codigo_iso})
+                        </option>
+                      ))}
+                    </select>
                   </div>
 
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                      <Wrench className="w-4 h-4 inline mr-1" />
-                      Tamaño del Motor (cc) *
+                      <MapPin className="w-4 h-4 inline mr-1" />
+                      Ciudad *
                     </label>
                     <input
-                      type="number"
-                      value={vehicleData.engine_size}
+                      type="text"
+                      value={vehicleData.ciudad}
                       onChange={(e) =>
                         setVehicleData({
                           ...vehicleData,
-                          engine_size: e.target.value,
+                          ciudad: e.target.value,
                         })
                       }
                       className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                      placeholder="1800"
+                      placeholder="Ej: Santiago, Valparaíso, Concepción..."
                     />
                   </div>
                 </div>
@@ -670,32 +742,34 @@ export default function EditPublicationPage() {
               <div className="border-t pt-6">
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   <FileText className="w-4 h-4 inline mr-1" />
-                  Descripción *
+                  Descripción del Vehículo *
                 </label>
                 <textarea
-                  value={vehicleData.description}
+                  value={vehicleData.descripcion}
                   onChange={(e) =>
                     setVehicleData({
                       ...vehicleData,
-                      description: e.target.value,
+                      descripcion: e.target.value,
                     })
                   }
-                  rows={5}
+                  rows={4}
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                   placeholder="Describe tu vehículo, condiciones, extras, historial, etc."
                 />
               </div>
-
+              
               {/* Botones */}
               <div className="flex gap-4 pt-6 border-t">
                 <button
-                  onClick={() => router.push("/mypost")}
+                  type="button"
+                  onClick={() => router.back()}
                   disabled={saving}
                   className="flex-1 px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-semibold disabled:opacity-50"
                 >
                   Cancelar
                 </button>
                 <button
+                  type="button"
                   onClick={handleSubmit}
                   disabled={saving}
                   className="flex-1 flex items-center justify-center gap-2 px-6 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-lg hover:shadow-lg transition-all font-semibold disabled:opacity-50"
@@ -703,7 +777,7 @@ export default function EditPublicationPage() {
                   {saving ? (
                     <>
                       <Loader2 className="w-5 h-5 animate-spin" />
-                      Guardando cambios...
+                      Guardando...
                     </>
                   ) : (
                     <>

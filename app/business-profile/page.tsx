@@ -4,713 +4,703 @@ import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import {
-  Building2,
-  LogOut,
   Loader2,
-  Phone,
-  MapPin,
-  Save,
-  Edit2,
-  Mail,
-  Globe,
-  FileText,
-  MapPinned,
-  Menu,
-  ChevronDown,
+  AlertCircle,
+  LogOut,
   Plus,
   List,
   Heart,
-  Calendar,
-  Briefcase,
-  IdCard,
+  Flag,
+  Edit2,
+  Menu,
+  X,
+  CheckCircle,
 } from "lucide-react";
 
-interface UserProfile {
-  id: string;
-  email: string;
-  created_at: string;
-  user_metadata?: {
-    account_type?: string;
-    full_name?: string;
-    position?: string;
-  };
+interface EmpresaData {
+  id: number;
+  nombre_comercial: string;
+  rut_empresa: string;
+  correo_electronico: string;
+  telefono?: string;
+  representante_legal: string;
+  rut_representante: string;
+  region: number;
+  ciudad: string;
+  validada: boolean;
+  region_nombre?: string;
 }
 
-interface BusinessProfileData {
-  legal_name: string;
-  commercial_name: string;
-  rut: string;
-  region: string;
-  city: string;
-  address: string;
-  corporate_email: string;
-  phone: string;
-  website: string;
+interface Region {
+  id: number;
+  nombre_region: string;
 }
-
-const REGIONES_CHILE = [
-  "Arica y Parinacota",
-  "Tarapacá",
-  "Antofagasta",
-  "Atacama",
-  "Coquimbo",
-  "Valparaíso",
-  "Metropolitana de Santiago",
-  "O'Higgins",
-  "Maule",
-  "Ñuble",
-  "Biobío",
-  "La Araucanía",
-  "Los Ríos",
-  "Los Lagos",
-  "Aysén",
-  "Magallanes",
-];
 
 export default function BusinessProfilePage() {
   const router = useRouter();
-  const [user, setUser] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
+  const [empresa, setEmpresa] = useState<EmpresaData | null>(null);
+  const [errorMessage, setErrorMessage] = useState("");
+  const [session, setSession] = useState<any>(null);
   const [isEditing, setIsEditing] = useState(false);
-  const [successMessage, setSuccessMessage] = useState("");
   const [showMenu, setShowMenu] = useState(false);
-
-  const [profileData, setProfileData] = useState<BusinessProfileData>({
-    legal_name: "",
-    commercial_name: "",
-    rut: "",
-    region: "",
-    city: "",
-    address: "",
-    corporate_email: "",
-    phone: "+56",
-    website: "",
-  });
+  const [editForm, setEditForm] = useState<EmpresaData | null>(null);
+  const [regions, setRegions] = useState<Region[]>([]);
+  const [editLoading, setEditLoading] = useState(false);
+  const [editSuccess, setEditSuccess] = useState(false);
 
   useEffect(() => {
-    const getUser = async () => {
+    checkAuth();
+    loadRegions();
+  }, []);
+
+  const checkAuth = async () => {
+    try {
+      console.log("🔍 Verificando autenticación de empresa...");
+
       const {
-        data: { session },
+        data: { session: authSession },
       } = await supabase.auth.getSession();
 
-      if (!session) {
+      if (!authSession) {
+        console.log("❌ No hay sesión");
         router.push("/login");
         return;
       }
 
-      // Verificar que sea cuenta empresa
-      if (session.user.user_metadata?.account_type !== "business") {
-        router.push("/profile");
-        return;
-      }
-
-      setUser(session.user as UserProfile);
-      await loadProfile(session.user.id);
-      setLoading(false);
-    };
-
-    getUser();
-
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (!session) {
-        router.push("/login");
-      }
-    });
-
-    return () => subscription.unsubscribe();
-  }, [router]);
-
-  const loadProfile = async (userId: string) => {
-    try {
-      const { data, error } = await supabase
-        .from("business_profiles")
+      // Verificar si es empresa
+      const { data: empresaData, error: empresaError } = await supabase
+        .from("empresa")
         .select("*")
-        .eq("id", userId)
+        .eq("usuario_id", authSession.user.id)
         .single();
 
-      if (error && error.code !== "PGRST116") {
-        console.error("Error loading profile:", error);
+      if (empresaError || !empresaData) {
+        console.log("❌ No es empresa, redirigiendo...");
+        router.push("/login");
         return;
       }
 
-      if (data) {
-        setProfileData({
-          legal_name: data.legal_name || "",
-          commercial_name: data.commercial_name || "",
-          rut: data.rut || "",
-          region: data.region || "",
-          city: data.city || "",
-          address: data.address || "",
-          corporate_email: data.corporate_email || "",
-          phone: data.phone || "+56",
-          website: data.website || "",
-        });
-      } else {
-        setIsEditing(true);
-      }
-    } catch (error) {
-      console.error("Error:", error);
+      console.log("✅ Empresa verificada");
+      setSession(authSession);
+
+      // Cargar datos de empresa
+      await loadEmpresaData(authSession.user.id);
+    } catch (error: any) {
+      console.error("❌ Error en checkAuth:", error);
+      router.push("/login");
     }
   };
 
-  const handleSave = async () => {
-    if (!user) return;
-
-    if (
-      !profileData.legal_name ||
-      !profileData.commercial_name ||
-      !profileData.rut ||
-      !profileData.region ||
-      !profileData.city ||
-      !profileData.address ||
-      !profileData.corporate_email ||
-      !profileData.phone
-    ) {
-      alert("Por favor completa todos los campos obligatorios");
-      return;
-    }
-
-    if (!profileData.phone.startsWith("+56")) {
-      alert("El número debe comenzar con +56");
-      return;
-    }
-
-    setSaving(true);
-    setSuccessMessage("");
-
+  const loadRegions = async () => {
     try {
-      const { error } = await supabase.from("business_profiles").upsert({
-        id: user.id,
-        legal_name: profileData.legal_name,
-        commercial_name: profileData.commercial_name,
-        rut: profileData.rut,
-        region: profileData.region,
-        city: profileData.city,
-        address: profileData.address,
-        corporate_email: profileData.corporate_email,
-        phone: profileData.phone,
-        website: profileData.website,
-        updated_at: new Date().toISOString(),
-      });
+      const { data, error } = await supabase
+        .from("region")
+        .select("id, nombre_region")
+        .order("nombre_region", { ascending: true });
 
       if (error) throw error;
+      setRegions(data || []);
+    } catch (error) {
+      console.error("Error loading regions:", error);
+    }
+  };
 
-      setSuccessMessage("Perfil guardado exitosamente");
-      setIsEditing(false);
-      setTimeout(() => setSuccessMessage(""), 3000);
+  const loadEmpresaData = async (userId: string) => {
+    try {
+      console.log("📥 Cargando datos de empresa para usuario:", userId);
+
+      const { data, error } = await supabase
+        .from("empresa")
+        .select("*")
+        .eq("usuario_id", userId)
+        .single();
+
+      console.log("Resultado query empresa:", { data, error });
+
+      if (error) {
+        console.error("❌ Error al cargar empresa:", error);
+        if (error.code === "PGRST116") {
+          setErrorMessage(
+            "No se encontraron datos de empresa asociados a tu cuenta"
+          );
+        } else {
+          setErrorMessage(error.message || "Error al cargar datos");
+        }
+        setLoading(false);
+        return;
+      }
+
+      if (!data) {
+        console.log("⚠️ No hay datos de empresa");
+        setErrorMessage("No se encontraron datos de empresa");
+        setLoading(false);
+        return;
+      }
+
+      console.log("✅ Datos de empresa cargados:", data);
+
+      // Cargar nombre de la región
+      const { data: regionData, error: regionError } = await supabase
+        .from("region")
+        .select("nombre_region")
+        .eq("id", data.region)
+        .single();
+
+      console.log("Resultado query región:", { regionData, regionError });
+
+      const empresaConRegion = {
+        ...data,
+        region_nombre: regionData?.nombre_region || "Desconocida",
+      };
+
+      setEmpresa(empresaConRegion);
+      setLoading(false);
     } catch (error: any) {
-      alert("Error al guardar el perfil: " + error.message);
-    } finally {
-      setSaving(false);
+      console.error("❌ Error en loadEmpresaData:", error);
+      setErrorMessage(error.message || "Error al cargar datos");
+      setLoading(false);
     }
   };
 
   const handleLogout = async () => {
-    await supabase.auth.signOut();
-    router.push("/login");
+    try {
+      await supabase.auth.signOut();
+      router.push("/login");
+    } catch (error) {
+      console.error("Error al cerrar sesión:", error);
+    }
   };
 
-  const handlePhoneChange = (value: string) => {
-    if (!value.startsWith("+56")) {
-      setProfileData({ ...profileData, phone: "+56" });
-    } else {
-      setProfileData({ ...profileData, phone: value });
+  const startEditing = () => {
+    if (empresa) {
+      setEditForm({ ...empresa });
+      setIsEditing(true);
+      setEditSuccess(false);
+      setShowMenu(false);
     }
+  };
+
+  const handleEditChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
+  ) => {
+    const { name, value } = e.target;
+    if (editForm) {
+      setEditForm({
+        ...editForm,
+        [name]: name === "region" ? parseInt(value) : value,
+      });
+    }
+  };
+
+  const handleSaveChanges = async () => {
+    if (!editForm || !session) return;
+
+    setEditLoading(true);
+
+    try {
+      const { error } = await supabase
+        .from("empresa")
+        .update({
+          nombre_comercial: editForm.nombre_comercial,
+          correo_electronico: editForm.correo_electronico,
+          telefono: editForm.telefono,
+          ciudad: editForm.ciudad,
+          region: editForm.region,
+          representante_legal: editForm.representante_legal,
+          rut_representante: editForm.rut_representante,
+        })
+        .eq("usuario_id", session.user.id);
+
+      if (error) throw error;
+
+      setEmpresa(editForm);
+      setIsEditing(false);
+      setEditSuccess(true);
+      setTimeout(() => setEditSuccess(false), 3000);
+    } catch (error: any) {
+      console.error("Error updating empresa:", error);
+      alert("Error al actualizar: " + error.message);
+    } finally {
+      setEditLoading(false);
+    }
+  };
+
+  const cancelEditing = () => {
+    setIsEditing(false);
+    setEditForm(null);
   };
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-indigo-50 to-purple-100 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-purple-50 to-pink-100 flex items-center justify-center">
         <div className="text-center">
-          <Loader2 className="w-12 h-12 text-indigo-600 animate-spin mx-auto mb-4" />
-          <p className="text-gray-600">Cargando perfil...</p>
+          <Loader2 className="w-12 h-12 text-purple-600 animate-spin mx-auto mb-4" />
+          <p className="text-gray-600">Cargando perfil de empresa...</p>
         </div>
       </div>
     );
   }
 
-  if (!user) {
-    return null;
+  if (errorMessage) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-purple-50 to-pink-100 flex items-center justify-center p-4">
+        <div className="bg-white rounded-2xl shadow-xl p-8 max-w-md text-center">
+          <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
+          <h2 className="text-2xl font-bold text-gray-800 mb-2">Error</h2>
+          <p className="text-gray-600 mb-6">{errorMessage}</p>
+          <div className="flex gap-3">
+            <button
+              onClick={() => router.push("/")}
+              className="flex-1 bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 rounded-lg transition-colors"
+            >
+              Ir al Inicio
+            </button>
+            <button
+              onClick={handleLogout}
+              className="flex-1 bg-red-600 hover:bg-red-700 text-white font-bold py-2 rounded-lg transition-colors"
+            >
+              Cerrar Sesión
+            </button>
+          </div>
+        </div>
+      </div>
+    );
   }
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString("es-ES", {
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-    });
-  };
-
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-indigo-50 to-purple-100">
-      <nav className="bg-white shadow-md">
-        <div className="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
-          <div className="flex items-center gap-3">
-            <Building2 className="w-8 h-8 text-indigo-600" />
-            <h1 className="text-2xl font-bold text-indigo-600">
-              Perfil Empresarial
-            </h1>
-          </div>
+  if (!empresa) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-purple-50 to-pink-100 flex items-center justify-center p-4">
+        <div className="bg-white rounded-2xl shadow-xl p-8 max-w-md text-center">
+          <AlertCircle className="w-16 h-16 text-yellow-500 mx-auto mb-4" />
+          <h2 className="text-2xl font-bold text-gray-800 mb-2">Sin Datos</h2>
+          <p className="text-gray-600 mb-6">
+            No se encontraron datos de empresa
+          </p>
           <button
-            onClick={handleLogout}
-            className="flex items-center gap-2 bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600 transition-colors"
+            onClick={() => router.push("/")}
+            className="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 rounded-lg transition-colors"
           >
-            <LogOut className="w-4 h-4" />
-            Cerrar Sesión
+            Ir al Inicio
           </button>
         </div>
-      </nav>
+      </div>
+    );
+  }
 
-      <div className="max-w-4xl mx-auto p-6 mt-8">
-        <div className="bg-white rounded-lg shadow-xl overflow-hidden">
-          <div className="bg-gradient-to-r from-indigo-600 to-purple-600 h-32"></div>
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-purple-50 to-pink-100 py-8 px-4">
+      <div className="max-w-4xl mx-auto">
+        {/* Header */}
+        <div className="flex items-center justify-between mb-8">
+          <div>
+            <h1 className="text-4xl font-bold text-gray-800">
+              {empresa.nombre_comercial}
+            </h1>
+            <p className="text-gray-600 mt-1">Mi Perfil de Empresa</p>
+          </div>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={handleLogout}
+              className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg transition-colors flex items-center gap-2"
+            >
+              <LogOut className="w-5 h-5" />
+              Cerrar Sesión
+            </button>
 
-          <div className="relative px-8 pb-8">
-            <div className="flex items-end justify-between -mt-16 mb-6">
-              <div className="flex items-end">
-                <div className="w-32 h-32 bg-white rounded-2xl border-4 border-white shadow-lg flex items-center justify-center">
-                  <Building2 className="w-20 h-20 text-indigo-400" />
-                </div>
-                <div className="ml-6 mb-5">
-                  <h2 className="text-3xl font-bold text-gray-800 text-white">
-                    {profileData.commercial_name ||
-                      "Completa tu perfil empresarial"}
-                  </h2>
-                  <p className="text-gray-600">
-                    {user.user_metadata?.full_name || "Representante Legal"}
-                  </p>
-                  {user.user_metadata?.position && (
-                    <p className="text-sm text-gray-500 flex items-center gap-1">
-                      <Briefcase className="w-3 h-3" />
-                      {user.user_metadata.position}
-                    </p>
-                  )}
-                </div>
-              </div>
+            {/* Botón menú móvil */}
+            <button
+              onClick={() => setShowMenu(!showMenu)}
+              className="md:hidden bg-purple-600 hover:bg-purple-700 text-white p-3 rounded-lg transition-colors"
+            >
+              {showMenu ? (
+                <X className="w-6 h-6" />
+              ) : (
+                <Menu className="w-6 h-6" />
+              )}
+            </button>
+          </div>
+        </div>
 
-              <div className="relative mb-1">
-                <button
-                  onClick={() => setShowMenu(!showMenu)}
-                  className="flex items-center gap-2 bg-gradient-to-r from-indigo-600 to-purple-600 text-white px-6 py-3 rounded-xl hover:shadow-lg transition-all font-semibold"
-                >
-                  <Menu className="w-5 h-5" />
-                  Opciones
-                  <ChevronDown
-                    className={`w-4 h-4 transition-transform ${
-                      showMenu ? "rotate-180" : ""
-                    }`}
-                  />
-                </button>
+        {/* Estado de Validación */}
+        {!empresa.validada && (
+          <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-6 rounded">
+            <p className="text-yellow-700 font-semibold">
+              ⚠️ Tu empresa aún no ha sido validada por un administrador.
+            </p>
+            <p className="text-yellow-600 text-sm mt-1">
+              Una vez validada, podrás publicar vehículos.
+            </p>
+          </div>
+        )}
 
-                {showMenu && (
-                  <>
-                    <div
-                      className="fixed inset-0 z-10"
-                      onClick={() => setShowMenu(false)}
-                    ></div>
+        {empresa.validada && (
+          <div className="bg-green-50 border-l-4 border-green-400 p-4 mb-6 rounded">
+            <p className="text-green-700 font-semibold">
+              ✅ Tu empresa ha sido validada exitosamente.
+            </p>
+          </div>
+        )}
 
-                    <div className="absolute top-full left-0 mt-2 w-64 bg-white rounded-xl shadow-2xl border border-gray-200 overflow-hidden z-20">
-                      <button
-                        onClick={() => {
-                          router.push("/publication");
-                          setShowMenu(false);
-                        }}
-                        className="w-full flex items-center gap-3 px-4 py-3 hover:bg-green-50 transition-colors text-left group"
-                      >
-                        <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center group-hover:bg-green-200 transition-colors">
-                          <Plus className="w-5 h-5 text-green-600" />
-                        </div>
-                        <div>
-                          <p className="font-semibold text-gray-800">
-                            Publicar
-                          </p>
-                          <p className="text-xs text-gray-500">
-                            Nuevo vehículo
-                          </p>
-                        </div>
-                      </button>
+        {/* Acciones Rápidas - Escritorio */}
+        <div className="hidden md:grid grid-cols-5 gap-4 mb-8">
+          <button
+            onClick={() => router.push("/publication")}
+            disabled={!empresa.validada}
+            className="bg-green-600 hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed text-white p-4 rounded-xl transition-colors flex flex-col items-center justify-center gap-2 font-semibold"
+          >
+            <Plus className="w-6 h-6" />
+            Publicar
+          </button>
 
-                      <div className="border-t border-gray-100"></div>
+          <button
+            onClick={() => router.push("/mypost")}
+            className="bg-purple-600 hover:bg-purple-700 text-white p-4 rounded-xl transition-colors flex flex-col items-center justify-center gap-2 font-semibold"
+          >
+            <List className="w-6 h-6" />
+            Mis Publicaciones
+          </button>
 
-                      <button
-                        onClick={() => {
-                          router.push("/mypost");
-                          setShowMenu(false);
-                        }}
-                        className="w-full flex items-center gap-3 px-4 py-3 hover:bg-purple-50 transition-colors text-left group"
-                      >
-                        <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center group-hover:bg-purple-200 transition-colors">
-                          <List className="w-5 h-5 text-purple-600" />
-                        </div>
-                        <div>
-                          <p className="font-semibold text-gray-800">
-                            Mis Publicaciones
-                          </p>
-                          <p className="text-xs text-gray-500">
-                            Gestionar publicaciones
-                          </p>
-                        </div>
-                      </button>
+          <button
+            onClick={() => router.push("/favorites")}
+            className="bg-pink-600 hover:bg-pink-700 text-white p-4 rounded-xl transition-colors flex flex-col items-center justify-center gap-2 font-semibold"
+          >
+            <Heart className="w-6 h-6" />
+            Mis Favoritos
+          </button>
 
-                      <div className="border-t border-gray-100"></div>
+          <button
+            onClick={() => router.push("/my-reports")}
+            className="bg-red-600 hover:bg-red-700 text-white p-4 rounded-xl transition-colors flex flex-col items-center justify-center gap-2 font-semibold"
+          >
+            <Flag className="w-6 h-6" />
+            Mis Reportes
+          </button>
 
-                      <button
-                        onClick={() => {
-                          router.push("/favorites");
-                          setShowMenu(false);
-                        }}
-                        className="w-full flex items-center gap-3 px-4 py-3 hover:bg-pink-50 transition-colors text-left group"
-                      >
-                        <div className="w-10 h-10 bg-pink-100 rounded-lg flex items-center justify-center group-hover:bg-pink-200 transition-colors">
-                          <Heart className="w-5 h-5 text-pink-600" />
-                        </div>
-                        <div>
-                          <p className="font-semibold text-gray-800">
-                            Mis Favoritos
-                          </p>
-                          <p className="text-xs text-gray-500">
-                            Vehículos guardados
-                          </p>
-                        </div>
-                      </button>
+          <button
+            onClick={startEditing}
+            className="bg-blue-600 hover:bg-blue-700 text-white p-4 rounded-xl transition-colors flex flex-col items-center justify-center gap-2 font-semibold"
+          >
+            <Edit2 className="w-6 h-6" />
+            Editar Perfil
+          </button>
+        </div>
 
-                      {!isEditing && (
-                        <>
-                          <div className="border-t border-gray-100"></div>
+        {/* Menú Móvil */}
+        {showMenu && (
+          <div className="md:hidden bg-white rounded-2xl shadow-xl p-4 mb-8 space-y-3">
+            <button
+              onClick={() => {
+                router.push("/publication");
+                setShowMenu(false);
+              }}
+              disabled={!empresa.validada}
+              className="w-full bg-green-600 hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed text-white p-3 rounded-lg transition-colors flex items-center justify-center gap-2 font-semibold"
+            >
+              <Plus className="w-5 h-5" />
+              Publicar
+            </button>
 
-                          <button
-                            onClick={() => {
-                              setIsEditing(true);
-                              setShowMenu(false);
-                            }}
-                            className="w-full flex items-center gap-3 px-4 py-3 hover:bg-indigo-50 transition-colors text-left group"
-                          >
-                            <div className="w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center group-hover:bg-indigo-200 transition-colors">
-                              <Edit2 className="w-5 h-5 text-indigo-600" />
-                            </div>
-                            <div>
-                              <p className="font-semibold text-gray-800">
-                                Editar Perfil
-                              </p>
-                              <p className="text-xs text-gray-500">
-                                Actualizar información
-                              </p>
-                            </div>
-                          </button>
-                        </>
-                      )}
-                    </div>
-                  </>
-                )}
-              </div>
+            <button
+              onClick={() => {
+                router.push("/mypost");
+                setShowMenu(false);
+              }}
+              className="w-full bg-purple-600 hover:bg-purple-700 text-white p-3 rounded-lg transition-colors flex items-center justify-center gap-2 font-semibold"
+            >
+              <List className="w-5 h-5" />
+              Mis Publicaciones
+            </button>
+
+            <button
+              onClick={() => {
+                router.push("/favorites");
+                setShowMenu(false);
+              }}
+              className="w-full bg-pink-600 hover:bg-pink-700 text-white p-3 rounded-lg transition-colors flex items-center justify-center gap-2 font-semibold"
+            >
+              <Heart className="w-5 h-5" />
+              Mis Favoritos
+            </button>
+
+            <button
+              onClick={() => {
+                router.push("/my-reports");
+                setShowMenu(false);
+              }}
+              className="w-full bg-red-600 hover:bg-red-700 text-white p-3 rounded-lg transition-colors flex items-center justify-center gap-2 font-semibold"
+            >
+              <Flag className="w-5 h-5" />
+              Mis Reportes
+            </button>
+
+            <button
+              onClick={() => {
+                startEditing();
+              }}
+              className="w-full bg-blue-600 hover:bg-blue-700 text-white p-3 rounded-lg transition-colors flex items-center justify-center gap-2 font-semibold"
+            >
+              <Edit2 className="w-5 h-5" />
+              Editar Perfil
+            </button>
+          </div>
+        )}
+
+        {/* Información de la Empresa */}
+        <div className="bg-white rounded-2xl shadow-xl p-8 mb-6">
+          <h2 className="text-2xl font-bold text-gray-800 mb-6">
+            Información de la Empresa
+          </h2>
+
+          <div className="grid md:grid-cols-2 gap-6">
+            <div>
+              <label className="text-sm font-semibold text-gray-600">
+                Nombre Comercial
+              </label>
+              <p className="text-lg text-gray-800 font-medium mt-1">
+                {empresa.nombre_comercial}
+              </p>
             </div>
 
-            {successMessage && (
-              <div className="mb-6 bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg">
-                ✓ {successMessage}
+            <div>
+              <label className="text-sm font-semibold text-gray-600">
+                RUT Empresa
+              </label>
+              <p className="text-lg text-gray-800 font-medium mt-1">
+                {empresa.rut_empresa}
+              </p>
+            </div>
+
+            <div>
+              <label className="text-sm font-semibold text-gray-600">
+                Email
+              </label>
+              <p className="text-lg text-gray-800 font-medium mt-1">
+                {empresa.correo_electronico}
+              </p>
+            </div>
+
+            <div>
+              <label className="text-sm font-semibold text-gray-600">
+                Teléfono
+              </label>
+              <p className="text-lg text-gray-800 font-medium mt-1">
+                {empresa.telefono || "No registrado"}
+              </p>
+            </div>
+
+            <div>
+              <label className="text-sm font-semibold text-gray-600">
+                Ciudad
+              </label>
+              <p className="text-lg text-gray-800 font-medium mt-1">
+                {empresa.ciudad}
+              </p>
+            </div>
+
+            <div>
+              <label className="text-sm font-semibold text-gray-600">
+                Región
+              </label>
+              <p className="text-lg text-gray-800 font-medium mt-1">
+                {empresa.region_nombre || "Cargando..."}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Información del Representante */}
+        <div className="bg-white rounded-2xl shadow-xl p-8">
+          <h2 className="text-2xl font-bold text-gray-800 mb-6">
+            Representante Legal
+          </h2>
+
+          <div className="grid md:grid-cols-2 gap-6">
+            <div>
+              <label className="text-sm font-semibold text-gray-600">
+                Nombre Completo
+              </label>
+              <p className="text-lg text-gray-800 font-medium mt-1">
+                {empresa.representante_legal}
+              </p>
+            </div>
+
+            <div>
+              <label className="text-sm font-semibold text-gray-600">RUT</label>
+              <p className="text-lg text-gray-800 font-medium mt-1">
+                {empresa.rut_representante}
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Modal de Edición */}
+      {isEditing && editForm && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-screen overflow-y-auto p-8">
+            {editSuccess && (
+              <div className="mb-4 p-4 bg-green-50 border border-green-200 rounded-lg flex items-start gap-3">
+                <CheckCircle className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
+                <p className="text-green-700 text-sm">
+                  Cambios guardados exitosamente
+                </p>
               </div>
             )}
 
-            <div className="space-y-6">
-              <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-lg p-6 border border-indigo-100">
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center gap-3">
-                    <Building2 className="w-6 h-6 text-indigo-600" />
-                    <h3 className="text-lg font-semibold text-gray-800">
-                      Información de la Empresa
-                    </h3>
-                  </div>
-                </div>
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-2xl font-bold text-gray-800">
+                Editar Perfil
+              </h2>
+              <button
+                onClick={cancelEditing}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
 
+            <div className="space-y-6">
+              {/* Información de la Empresa */}
+              <div>
+                <h3 className="text-lg font-bold text-gray-800 mb-4">
+                  Información de la Empresa
+                </h3>
                 <div className="grid md:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      <FileText className="w-4 h-4 inline mr-1" />
-                      Nombre Legal (Registro SII) *
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                      Nombre Comercial
                     </label>
                     <input
                       type="text"
-                      value={profileData.legal_name}
-                      onChange={(e) =>
-                        setProfileData({
-                          ...profileData,
-                          legal_name: e.target.value,
-                        })
-                      }
-                      disabled={!isEditing}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent disabled:bg-gray-100 disabled:text-gray-600"
-                      placeholder="Empresa S.A."
+                      name="nombre_comercial"
+                      value={editForm.nombre_comercial}
+                      onChange={handleEditChange}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-600 focus:border-transparent outline-none"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      <Building2 className="w-4 h-4 inline mr-1" />
-                      Nombre Comercial *
-                    </label>
-                    <input
-                      type="text"
-                      value={profileData.commercial_name}
-                      onChange={(e) =>
-                        setProfileData({
-                          ...profileData,
-                          commercial_name: e.target.value,
-                        })
-                      }
-                      disabled={!isEditing}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent disabled:bg-gray-100 disabled:text-gray-600"
-                      placeholder="Mi Empresa"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      <IdCard className="w-4 h-4 inline mr-1" />
-                      RUT *
-                    </label>
-                    <input
-                      type="text"
-                      value={profileData.rut}
-                      onChange={(e) =>
-                        setProfileData({ ...profileData, rut: e.target.value })
-                      }
-                      disabled={!isEditing}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent disabled:bg-gray-100 disabled:text-gray-600"
-                      placeholder="12.345.678-9"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      <Mail className="w-4 h-4 inline mr-1" />
-                      Correo Corporativo *
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                      Email
                     </label>
                     <input
                       type="email"
-                      value={profileData.corporate_email}
-                      onChange={(e) =>
-                        setProfileData({
-                          ...profileData,
-                          corporate_email: e.target.value,
-                        })
-                      }
-                      disabled={!isEditing}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent disabled:bg-gray-100 disabled:text-gray-600"
-                      placeholder="contacto@empresa.cl"
+                      name="correo_electronico"
+                      value={editForm.correo_electronico}
+                      onChange={handleEditChange}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-600 focus:border-transparent outline-none"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      <Phone className="w-4 h-4 inline mr-1" />
-                      Número de Celular *
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                      Teléfono
                     </label>
                     <input
                       type="tel"
-                      value={profileData.phone}
-                      onChange={(e) => handlePhoneChange(e.target.value)}
-                      disabled={!isEditing}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent disabled:bg-gray-100 disabled:text-gray-600"
-                      placeholder="+56912345678"
+                      name="telefono"
+                      value={editForm.telefono || ""}
+                      onChange={handleEditChange}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-600 focus:border-transparent outline-none"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      <Globe className="w-4 h-4 inline mr-1" />
-                      Sitio Web Oficial
-                    </label>
-                    <input
-                      type="url"
-                      value={profileData.website}
-                      onChange={(e) =>
-                        setProfileData({
-                          ...profileData,
-                          website: e.target.value,
-                        })
-                      }
-                      disabled={!isEditing}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent disabled:bg-gray-100 disabled:text-gray-600"
-                      placeholder="https://www.empresa.cl"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      <MapPin className="w-4 h-4 inline mr-1" />
-                      Región *
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                      Región
                     </label>
                     <select
-                      value={profileData.region}
-                      onChange={(e) =>
-                        setProfileData({
-                          ...profileData,
-                          region: e.target.value,
-                        })
-                      }
-                      disabled={!isEditing}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent disabled:bg-gray-100 disabled:text-gray-600"
+                      name="region"
+                      value={editForm.region}
+                      onChange={handleEditChange}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-600 focus:border-transparent outline-none appearance-none bg-white"
                     >
-                      <option value="">Selecciona una región</option>
-                      {REGIONES_CHILE.map((region) => (
-                        <option key={region} value={region}>
-                          {region}
+                      {regions.map((region) => (
+                        <option key={region.id} value={region.id}>
+                          {region.nombre_region}
                         </option>
                       ))}
                     </select>
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      <MapPin className="w-4 h-4 inline mr-1" />
-                      Ciudad *
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                      Ciudad
                     </label>
                     <input
                       type="text"
-                      value={profileData.city}
-                      onChange={(e) =>
-                        setProfileData({ ...profileData, city: e.target.value })
-                      }
-                      disabled={!isEditing}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent disabled:bg-gray-100 disabled:text-gray-600"
-                      placeholder="Santiago"
-                    />
-                  </div>
-
-                  <div className="md:col-span-2">
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      <MapPinned className="w-4 h-4 inline mr-1" />
-                      Dirección/Ubicación *
-                    </label>
-                    <input
-                      type="text"
-                      value={profileData.address}
-                      onChange={(e) =>
-                        setProfileData({
-                          ...profileData,
-                          address: e.target.value,
-                        })
-                      }
-                      disabled={!isEditing}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent disabled:bg-gray-100 disabled:text-gray-600"
-                      placeholder="Av. Libertador Bernardo O'Higgins 1234, Piso 5"
+                      name="ciudad"
+                      value={editForm.ciudad}
+                      onChange={handleEditChange}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-600 focus:border-transparent outline-none"
                     />
                   </div>
                 </div>
-
-                {isEditing && (
-                  <div className="flex gap-3 mt-6">
-                    <button
-                      onClick={handleSave}
-                      disabled={saving}
-                      className="flex items-center gap-2 bg-indigo-600 text-white px-6 py-2 rounded-lg hover:bg-indigo-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      {saving ? (
-                        <>
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                          Guardando...
-                        </>
-                      ) : (
-                        <>
-                          <Save className="w-4 h-4" />
-                          Guardar Cambios
-                        </>
-                      )}
-                    </button>
-                    <button
-                      onClick={() => {
-                        setIsEditing(false);
-                        if (user) loadProfile(user.id);
-                      }}
-                      disabled={saving}
-                      className="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
-                    >
-                      Cancelar
-                    </button>
-                  </div>
-                )}
               </div>
-              <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-lg p-6 border border-indigo-100">
-                <div className="flex items-center gap-3 mb-4">
-                  <Briefcase className="w-6 h-6 text-indigo-600" />
-                  <h3 className="text-lg font-semibold text-gray-800">
-                    Información del Representante
-                  </h3>
-                </div>
 
+              {/* Representante Legal */}
+              <div>
+                <h3 className="text-lg font-bold text-gray-800 mb-4">
+                  Representante Legal
+                </h3>
                 <div className="grid md:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">
                       Nombre Completo
                     </label>
-                    <div className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-700">
-                      {user.user_metadata?.full_name || "No especificado"}
-                    </div>
+                    <input
+                      type="text"
+                      name="representante_legal"
+                      value={editForm.representante_legal}
+                      onChange={handleEditChange}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-600 focus:border-transparent outline-none"
+                    />
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Cargo
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                      RUT
                     </label>
-                    <div className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-700 flex items-center gap-2">
-                      <Briefcase className="w-4 h-4 text-gray-500" />
-                      {user.user_metadata?.position || "No especificado"}
-                    </div>
-                  </div>
-
-                  <div className="md:col-span-2">
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      <Mail className="w-4 h-4 inline mr-1" />
-                      Correo Electrónico de Acceso
-                    </label>
-                    <div className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-700">
-                      {user.email}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="mt-4 bg-blue-50 border border-blue-200 rounded-lg p-4">
-                  <p className="text-sm text-blue-800">
-                    <strong>Nota:</strong> Esta información fue registrada al
-                    crear la cuenta. Para modificarla, contacta con soporte.
-                  </p>
-                </div>
-              </div>
-
-              <div className="bg-gradient-to-br from-purple-50 to-pink-50 rounded-lg p-6 border border-purple-100">
-                <h3 className="text-lg font-semibold text-gray-800 mb-4">
-                  <Calendar className="w-5 h-5 inline mr-2" />
-                  Información de la Cuenta
-                </h3>
-                <div className="space-y-3">
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Miembro desde</span>
-                    <span className="font-medium text-gray-800">
-                      {user && formatDate(user.created_at)}
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Tipo de cuenta</span>
-                    <span className="bg-indigo-100 text-indigo-700 px-3 py-1 rounded-full text-sm font-medium flex items-center gap-1">
-                      <Building2 className="w-3 h-3" />
-                      Empresa
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Estado</span>
-                    <span className="bg-green-100 text-green-700 px-3 py-1 rounded-full text-sm font-medium">
-                      Activa
-                    </span>
+                    <input
+                      type="text"
+                      name="rut_representante"
+                      value={editForm.rut_representante}
+                      onChange={handleEditChange}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-600 focus:border-transparent outline-none"
+                    />
                   </div>
                 </div>
               </div>
             </div>
+
+            {/* Botones de acción */}
+            <div className="flex gap-3 mt-8">
+              <button
+                onClick={cancelEditing}
+                disabled={editLoading}
+                className="flex-1 px-4 py-3 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg transition-colors font-semibold disabled:opacity-50"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleSaveChanges}
+                disabled={editLoading}
+                className="flex-1 px-4 py-3 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors font-semibold disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {editLoading ? (
+                  <>
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                    Guardando...
+                  </>
+                ) : (
+                  "Guardar Cambios"
+                )}
+              </button>
+            </div>
           </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }
