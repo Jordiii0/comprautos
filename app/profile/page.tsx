@@ -1,28 +1,14 @@
 "use client";
-
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import {
-  User,
-  LogOut,
-  UserCircle,
-  Mail,
-  Calendar,
-  Loader2,
-  Phone,
-  MapPin,
-  Save,
-  Edit2,
-  Plus,
-  List,
-  Heart,
-  ChevronDown,
-  Menu,
-  Flag,
-  AlertCircle,
+  User, LogOut, UserCircle, Mail, Calendar, Loader2, Phone,
+  MapPin, Save, Edit2, Plus, List, Heart, ChevronDown,
+  Menu, Flag, AlertCircle,
 } from "lucide-react";
 
+// Interfaces: ajusta según modelo real
 interface UserProfile {
   id: string;
   email: string;
@@ -30,21 +16,21 @@ interface UserProfile {
 }
 
 interface UserData {
-  id: number;
+  id: string;
   nombre: string;
   apellido: string;
-  correo_electronico: string;
+  correo: string;        // <--- CAMBIADO
   telefono: string | null;
   rut: string;
-  region: number | null;
-  ciudad: string | null;
+  region_id: number | null;
+  ciudad_id: number | null;
+  ciudad?: string | null; // opcional para mostrar nombre
   created_at: string;
   habilitado: boolean;
-  region_data?: {
-    nombre_region: string;
-  };
+  rol?: string;
 }
 
+// ...regions igual
 interface Region {
   id: number;
   nombre_region: string;
@@ -55,158 +41,105 @@ export default function ProfilePage() {
   const router = useRouter();
   const [user, setUser] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
+  const [userData, setUserData] = useState<UserData | null>(null);
+  const [regions, setRegions] = useState<any[]>([]);
+  const [formData, setFormData] = useState({
+    nombre: "", apellido: "", telefono: "", ciudad: "", region_id: "", ciudad_id: ""
+  });
   const [isEditing, setIsEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [successMessage, setSuccessMessage] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
   const [showMenu, setShowMenu] = useState(false);
+  
+  // MODAL hooks
+  const [showModal, setShowModal] = useState(false);
+  const [byeMsg, setByeMsg] = useState("");
+  const [loggingOut, setLoggingOut] = useState(false);
 
-  const [userData, setUserData] = useState<UserData | null>(null);
-  const [regions, setRegions] = useState<Region[]>([]);
+  // ⬇️ FUNCIONES para logout/modal
+  const handleLogoutModal = () => setShowModal(true);
+  const cancelLogout = () => setShowModal(false);
 
-  const [formData, setFormData] = useState({
-    nombre: "",
-    apellido: "",
-    telefono: "",
-    ciudad: "",
-    region: "",
-  });
+  const confirmLogout = async () => {
+    setLoggingOut(true);
+    setByeMsg("¡Hasta luego! 👋");
+    await supabase.auth.signOut();
+    setTimeout(() => {
+      router.replace("/login");
+    }, 1800); // 1.8 segundos antes de redirigir
+  };
 
   useEffect(() => {
     const verifyAndLoad = async () => {
       try {
-        console.log("🔍 Verificando acceso de usuario...");
-
-        const {
-          data: { session },
-        } = await supabase.auth.getSession();
-
-        if (!session || !session.user?.email) {
-          console.log("❌ No hay sesión");
-          router.push("/login");
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session || !session.user?.id) {
+          router.replace("/login");
           return;
         }
 
-        // Verificar si es usuario regular (no empresa ni admin)
+        // Buscar usuario por id (NO usuario_id)
         const { data: usuarioData, error: usuarioError } = await supabase
           .from("usuario")
-          .select("rol")
-          .eq("usuario_id", session.user.id)
+          .select("*")
+          .eq("id", session.user.id)
           .single();
 
         if (usuarioError || !usuarioData) {
-          console.log("❌ No es usuario, redirigiendo...");
-          router.push("/login");
+          router.replace("/login");
           return;
         }
 
-        if (usuarioData.rol !== "usuario") {
-          console.log("❌ No tiene rol de usuario, redirigiendo...");
-          router.push("/login");
+        if (usuarioData.rol && usuarioData.rol !== "usuario") {
+          router.replace("/login");
           return;
         }
 
-        // Verificar si es empresa
-        const { data: empresaData } = await supabase
-          .from("empresa")
-          .select("id")
-          .eq("usuario_id", session.user.id)
-          .single();
-
-        if (empresaData) {
-          console.log("❌ Es empresa, redirigiendo...");
-          router.push("/login");
-          return;
-        }
-
-        console.log("✅ Usuario verificado");
         setUser(session.user as UserProfile);
-        
         await loadRegions();
-        await loadUserData(session.user.email);
+        setUserData(usuarioData);
+
+        setFormData({
+          nombre: usuarioData.nombre || "",
+          apellido: usuarioData.apellido || "",
+          telefono: usuarioData.telefono || "",
+          ciudad: usuarioData.ciudad || "",
+          region_id: usuarioData.region_id?.toString() || "",
+          ciudad_id: usuarioData.ciudad_id?.toString() || "",
+        });
+
         setLoading(false);
       } catch (error) {
-        console.error("❌ Error en verificación:", error);
-        router.push("/login");
+        router.replace("/login");
       }
     };
 
     verifyAndLoad();
-
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (!session) {
-        router.push("/login");
-      }
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (!session) router.replace("/login");
     });
-
     return () => subscription.unsubscribe();
   }, [router]);
 
   const loadRegions = async () => {
     try {
-      const { data, error } = await supabase
+      const { data } = await supabase
         .from("region")
         .select("id, nombre_region, codigo_iso")
         .order("nombre_region");
-
-      if (error) throw error;
       setRegions(data || []);
-    } catch (error) {
-      console.error("Error loading regions:", error);
-    }
-  };
-
-  const loadUserData = async (email: string) => {
-    try {
-      const { data, error } = await supabase
-        .from("usuario")
-        .select("*")
-        .eq("correo_electronico", email)
-        .single();
-
-      if (error && error.code !== "PGRST116") {
-        console.error("Error loading user data:", error);
-        return;
-      }
-
-      if (data) {
-        setUserData(data);
-
-        if (!data.habilitado) {
-          setErrorMessage(
-            "Tu cuenta ha sido deshabilitada por un administrador."
-          );
-        }
-
-        setFormData({
-          nombre: data.nombre || "",
-          apellido: data.apellido || "",
-          telefono: data.telefono || "",
-          ciudad: data.ciudad || "",
-          region: data.region?.toString() || "",
-        });
-      } else {
-        // Usuario no tiene datos completos, activar modo edición
-        setIsEditing(true);
-      }
-    } catch (error) {
-      console.error("Error:", error);
-    }
+    } catch (_) {}
   };
 
   const handleSave = async () => {
     if (!user) return;
-
     if (!formData.nombre || !formData.apellido) {
       alert("Por favor completa al menos el nombre y apellido");
       return;
     }
-
     setSaving(true);
     setSuccessMessage("");
-
     try {
       const { error } = await supabase
         .from("usuario")
@@ -214,16 +147,17 @@ export default function ProfilePage() {
           nombre: formData.nombre,
           apellido: formData.apellido,
           telefono: formData.telefono || null,
-          ciudad: formData.ciudad || null,
-          region: formData.region ? parseInt(formData.region) : null,
+          ciudad_id: formData.ciudad_id || null,
+          region_id: formData.region_id ? parseInt(formData.region_id) : null,
         })
-        .eq("correo_electronico", user.email);
-
+        .eq("id", user.id); // <----- CORRECCIÓN CLAVE PRIMARIA
       if (error) throw error;
 
       setSuccessMessage("Perfil actualizado exitosamente");
       setIsEditing(false);
-      await loadUserData(user.email);
+      // Recarga formulario
+      const { data } = await supabase.from("usuario").select("*").eq("id", user.id).single();
+      setUserData(data || null);
       setTimeout(() => setSuccessMessage(""), 3000);
     } catch (error: any) {
       alert("Error al guardar el perfil: " + error.message);
@@ -234,7 +168,7 @@ export default function ProfilePage() {
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
-    router.push("/login");
+    router.replace("/login");
   };
 
   if (loading) {
@@ -277,7 +211,7 @@ export default function ProfilePage() {
           <h1 className="text-2xl font-bold text-indigo-600">Mi Perfil</h1>
           <button
             type="button"
-            onClick={handleLogout}
+            onClick={handleLogoutModal}
             className="flex items-center gap-2 bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600 transition-colors"
           >
             <LogOut className="w-4 h-4" />
@@ -286,6 +220,38 @@ export default function ProfilePage() {
         </div>
       </nav>
 
+      {/* MODAL confirmación */}
+      {showModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50">
+          <div className="bg-white rounded-2xl shadow-xl p-6 w-full max-w-xs">
+            <h3 className="text-lg font-bold mb-2 text-gray-800">¿Salir de la cuenta?</h3>
+            <p className="text-gray-600 mb-4">¿Estás seguro de que quieres cerrar sesión?</p>
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={cancelLogout}
+                className="bg-gray-100 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-200"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={confirmLogout}
+                className="bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600"
+                disabled={loggingOut}
+              >
+                Sí, cerrar sesión
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {byeMsg && (
+        <div className="fixed inset-0 flex items-center justify-center z-50 bg-black bg-opacity-30">
+          <div className="bg-white rounded-xl shadow-xl p-6 text-center">
+            <span className="text-2xl">👋</span>
+            <div className="mt-2 text-lg text-gray-700 font-semibold">{byeMsg}</div>
+          </div>
+        </div>
+      )}
       <div className="max-w-4xl mx-auto p-6 mt-8">
         <div className="bg-white rounded-lg shadow-xl overflow-hidden">
           <div className="bg-gradient-to-r from-indigo-500 to-purple-600 h-32"></div>
@@ -585,11 +551,11 @@ export default function ProfilePage() {
                       Región
                     </label>
                     <select
-                      value={formData.region}
+                      value={formData.region_id}
                       onChange={(e) =>
                         setFormData({
                           ...formData,
-                          region: e.target.value,
+                          region_id: e.target.value,
                         })
                       }
                       disabled={!isEditing}
@@ -629,7 +595,14 @@ export default function ProfilePage() {
                       type="button"
                       onClick={() => {
                         setIsEditing(false);
-                        if (user) loadUserData(user.email);
+                        setFormData({
+                          nombre: userData?.nombre || "",
+                          apellido: userData?.apellido || "",
+                          telefono: userData?.telefono || "",
+                          ciudad: userData?.ciudad || "",
+                          region_id: userData?.region_id?.toString() || "",
+                          ciudad_id: userData?.ciudad_id?.toString() || "",
+                        });
                       }}
                       disabled={saving}
                       className="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
@@ -674,7 +647,7 @@ export default function ProfilePage() {
                     <div className="flex justify-between items-center pt-2 border-t">
                       <span className="text-gray-600">Ubicación</span>
                       <span className="font-medium text-gray-800">
-                        {userData.ciudad}, {getRegionName(userData.region)}
+                        {userData.ciudad}, {getRegionName(userData.region_id)}
                       </span>
                     </div>
                   )}
@@ -687,3 +660,4 @@ export default function ProfilePage() {
     </div>
   );
 }
+
