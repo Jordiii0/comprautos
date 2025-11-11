@@ -40,10 +40,10 @@ export default function LoginPage() {
 
         // Buscar empresa
         const { data: empresaData } = await supabase
-          .from("empresa")
-          .select("id")
-          .eq("id", userId)
-          .maybeSingle();
+        .from("empresa")
+        .select("id, validada")
+        .eq("usuario_id", userId)
+        .maybeSingle();
 
         if (empresaData) {
           router.replace("/business-profile");
@@ -126,7 +126,7 @@ export default function LoginPage() {
       const { data: empresaData } = await supabase
         .from("empresa")
         .select("id, validada")
-        .eq("id", userId)
+        .eq("usuario_id", userId)
         .maybeSingle();
       if (empresaData) {
         setSuccessMessage("¡Bienvenido!");

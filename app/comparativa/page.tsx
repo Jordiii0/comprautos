@@ -31,7 +31,9 @@ interface VehiclePublication {
   kilometraje: number;
   transmision: string;
   tipo_combustible_id: number;
-  cilindrada: string;
+  // Cilindrada es INTEGER en el esquema, pero tu interfaz lo define como string. 
+  // Lo mantendré como string para evitar errores de tipo en el resto del código.
+  cilindrada: string; 
   descripcion: string;
   estado_vehiculo: string;
   oculto: boolean;
@@ -54,7 +56,7 @@ interface Favorite {
   vehiculo_id: number;
 }
 
-// Componente para cargar imágenes
+// Componente para cargar imágenes (Se mantiene sin cambios)
 const VehicleImageComponent = ({ src, alt }: { src: string; alt: string }) => {
   const [imageUrl, setImageUrl] = useState<string>("");
   const [imgLoading, setImgLoading] = useState(true);
@@ -94,7 +96,7 @@ const VehicleImageComponent = ({ src, alt }: { src: string; alt: string }) => {
       onError={(e) => {
         console.error("Error cargando imagen:", imageUrl);
         e.currentTarget.src =
-          'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"%3E%3Cpath fill="%23999" d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V5h14v14zm-5.04-6.71l-2.75-3.54c-.3-.38-.77-.59-1.25-.59-.67 0-1.22.44-1.39 1.06-.1.37-.07.77.08 1.12l2.91 3.75-2.88 3.74c-.15.36-.18.77-.08 1.14.17.62.73 1.06 1.39 1.06.48 0 .95-.21 1.25-.59l2.75-3.54 2.75 3.54c.3.38.77.59 1.25.59.67 0 1.22-.44 1.39-1.06.1-.37.07-.77-.08-1.12l-2.91-3.75 2.88-3.74c.15-.36.18-.77.08-1.14-.17-.62-.73-1.06-1.39-1.06-.48 0-.95.21-1.25.59l-2.75 3.54z"/%3E%3C/svg%3E';
+          'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"%3E%3Cpath fill="%23999" d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V5h14v14zm-5.04-6.71l-2.75-3.54c-.3-.38-.77-.59-1.25-.59-.67 0-1.22.44-1.39 1.06-.1.37-.07.77.08 1.12l2.91 3.75-2.88 3.74c-.15.36-.18.77-.08 1.14.17.62.73 1.06 1.39 1.06.48 0 .95-.21 1.25-.59l-2.75-3.54 2.75 3.54c.3.38.77.59 1.25.59.67 0 1.22-.44 1.39-1.06.1-.37.07-.77-.08-1.12l-2.91-3.75 2.88-3.74c.15-.36.18-.77.08-1.14-.17-.62-.73-1.06-1.39-1.06-.48 0-.95.21-1.25.59l-2.75 3.54z"/%3E%3C/svg%3E';
       }}
     />
   );
@@ -167,9 +169,13 @@ export default function ComparePage() {
         ...new Set(vehiclesData.map((v) => v.tipo_combustible_id)),
       ];
 
+      // ------------------------------------------------------------------
+      // ⭐ CAMBIO CLAVE AQUÍ: Usar nombre_combustible en lugar de nombre
+      // ------------------------------------------------------------------
       const { data: combustiblesData, error: combError } = await supabase
         .from("tipo_combustible")
-        .select("id, nombre")
+        // ✅ Corregido: Selecciona nombre_combustible
+        .select("id, nombre_combustible") 
         .in("id", combustibleIds);
 
       if (combError) {
@@ -177,7 +183,8 @@ export default function ComparePage() {
       }
 
       const combustiblesMap = (combustiblesData || []).reduce((acc, c) => {
-        acc[c.id] = c.nombre;
+        // ✅ Mapea usando nombre_combustible
+        acc[c.id] = c.nombre_combustible;
         return acc;
       }, {} as Record<number, string>);
 
@@ -187,10 +194,10 @@ export default function ComparePage() {
       const vehiclesWithImages = await Promise.all(
         vehiclesData.map(async (vehicle, idx) => {
           try {
-            // ← CAMBIO AQUÍ: usar url_imagen en lugar de url
+            // Se mantiene la selección de url_imagen, que es correcta
             const { data: imagesData } = await supabase
               .from("imagen_vehiculo")
-              .select("url_imagen")
+              .select("url_imagen") 
               .eq("vehiculo_id", vehicle.id);
 
             console.log(`📸 Imágenes para vehículo ${vehicle.id}:`, imagesData);
@@ -222,7 +229,8 @@ export default function ComparePage() {
               images,
               tipo_combustible: {
                 id: vehicle.tipo_combustible_id,
-                nombre:
+                // ✅ Accede al nombre correcto
+                nombre_combustible:
                   combustiblesMap[vehicle.tipo_combustible_id] || "Desconocido",
               },
             };
@@ -233,7 +241,7 @@ export default function ComparePage() {
               images: [],
               tipo_combustible: {
                 id: vehicle.tipo_combustible_id,
-                nombre:
+                nombre_combustible:
                   combustiblesMap[vehicle.tipo_combustible_id] || "Desconocido",
               },
             };
@@ -242,7 +250,7 @@ export default function ComparePage() {
       );
 
       console.log("📦 Vehículos con imágenes cargados:", vehiclesWithImages);
-      setVehicles(vehiclesWithImages);
+      setVehicles(vehiclesWithImages as any);
     } catch (error: any) {
       console.error("❌ Error en loadVehicles:", error);
       setVehicles([]);
@@ -317,7 +325,8 @@ export default function ComparePage() {
       case "transmision":
         return vehicle.transmision;
       case "tipo_combustible":
-        return vehicle.tipo_combustible?.nombre || "-"; // ← CAMBIO AQUÍ
+        // ⭐ Corregido: Accede a nombre_combustible
+        return vehicle.tipo_combustible?.nombre_combustible || "-"; 
       case "cilindrada":
         return vehicle.cilindrada || "-";
       case "estado_vehiculo":
@@ -339,7 +348,8 @@ export default function ComparePage() {
           case "kilometraje":
             return Number(v.kilometraje);
           case "cilindrada":
-            return v.cilindrada ? parseFloat(v.cilindrada) : null;
+            // El esquema sugiere INTEGER, lo parseamos como número si existe
+            return v.cilindrada ? parseFloat(v.cilindrada) : null; 
           default:
             return null;
         }
@@ -374,8 +384,10 @@ export default function ComparePage() {
     const min = Math.min(...(values as number[]));
     const max = Math.max(...(values as number[]));
 
+    // Precio y Kilometraje: Mejor es el MÁS BAJO (verde)
     if (attr === "precio" || attr === "kilometraje") {
       return current === min ? "bg-green-50 border-green-300" : "";
+    // Año y Cilindrada: Mejor es el MÁS ALTO (verde)
     } else if (attr === "anio" || attr === "cilindrada") {
       return current === max ? "bg-green-50 border-green-300" : "";
     }
@@ -397,7 +409,7 @@ export default function ComparePage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-indigo-50 to-purple-100 py-8 px-4">
       <div className="max-w-7xl mx-auto">
-        {/* Header */}
+        {/* Header (Se mantiene) */}
         <div className="mb-8">
           <button
             onClick={() => router.back()}
@@ -420,7 +432,7 @@ export default function ComparePage() {
           </div>
         </div>
 
-        {/* Vehicle Selection Cards */}
+        {/* Vehicle Selection Cards (Se mantiene) */}
         <div className="grid md:grid-cols-3 gap-6 mb-8">
           {selectedVehicles.map((vehicle, index) => (
             <div
@@ -478,7 +490,7 @@ export default function ComparePage() {
           ))}
         </div>
 
-        {/* Comparison Table */}
+        {/* Comparison Table (Se mantiene, con la corrección en 'Combustible') */}
         {selectedVehicles.some((v) => v !== null) && (
           <div className="bg-white rounded-2xl shadow-xl overflow-hidden">
             <div className="bg-gradient-to-r from-indigo-600 to-purple-600 px-6 py-4">
@@ -620,7 +632,8 @@ export default function ComparePage() {
                     {selectedVehicles.map((vehicle, index) => (
                       <td key={index} className="px-6 py-4 text-center">
                         <span className="text-gray-800">
-                          {vehicle?.tipo_combustible?.nombre || "-"}
+                          {/* ⭐ Corregido: Accede a nombre_combustible */}
+                          {vehicle?.tipo_combustible?.nombre_combustible || "-"} 
                         </span>
                       </td>
                     ))}
@@ -662,7 +675,7 @@ export default function ComparePage() {
           </div>
         )}
 
-        {/* Vehicle Selector Modal */}
+        {/* Vehicle Selector Modal (Se mantiene, con la corrección en 'Combustible' en la lista) */}
         {showSelector !== null && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
             <div className="bg-white rounded-2xl shadow-xl max-w-4xl w-full max-h-[80vh] overflow-hidden">
@@ -682,7 +695,7 @@ export default function ComparePage() {
               </div>
 
               <div className="p-6">
-                {/* View Mode Toggle */}
+                {/* View Mode Toggle (Se mantiene) */}
                 {user && favorites.length > 0 && (
                   <div className="flex gap-2 mb-4">
                     <button
@@ -710,7 +723,7 @@ export default function ComparePage() {
                   </div>
                 )}
 
-                {/* Search */}
+                {/* Search (Se mantiene) */}
                 <div className="relative mb-6">
                   <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
                   <input
@@ -722,7 +735,7 @@ export default function ComparePage() {
                   />
                 </div>
 
-                {/* Empty State for Favorites */}
+                {/* Empty State for Favorites (Se mantiene) */}
                 {viewMode === "favorites" && favorites.length === 0 && (
                   <div className="text-center py-12">
                     <Heart className="w-16 h-16 text-gray-300 mx-auto mb-4" />
@@ -741,7 +754,7 @@ export default function ComparePage() {
                   </div>
                 )}
 
-                {/* Vehicle List */}
+                {/* Vehicle List (Se mantiene) */}
                 {(viewMode !== "favorites" || favorites.length > 0) && (
                   <div className="max-h-96 overflow-y-auto space-y-3">
                     {filteredVehicles.length === 0 ? (
@@ -762,7 +775,7 @@ export default function ComparePage() {
                             key={vehicle.id}
                             onClick={() =>
                               !isSelected &&
-                              selectVehicle(vehicle, showSelector)
+                              selectVehicle(vehicle, showSelector as number)
                             }
                             disabled={isSelected}
                             className={`w-full flex items-center gap-4 p-4 rounded-xl border-2 transition-all relative ${

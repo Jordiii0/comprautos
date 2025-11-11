@@ -1,10 +1,14 @@
 "use client";
 
+import { Car, Heart } from "lucide-react";
+import ChartsPublicaciones from "./components/chartsPublicaciones";
+import ChartsCalificaciones from "./components/chartsCalificaciones";
+import ChartsVentas from "./components/chartsVentas";
+import StatsCard from "./components/statsCard";
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import {
-  Car,
   Edit2,
   Trash2,
   Eye,
@@ -14,12 +18,12 @@ import {
   Plus,
   Calendar,
   Gauge,
-  DollarSign,
   AlertCircle,
   CheckCircle,
   MapPin,
 } from "lucide-react";
 
+// 🚨 Interfaz actualizada: empresa_id es string (UUID) o null
 interface Vehicle {
   id: number;
   precio: number;
@@ -37,6 +41,8 @@ interface Vehicle {
   ciudad: string;
   created_at: string;
   oculto: boolean;
+  usuario_id: string | null; // UUID
+  empresa_id: string | null; // UUID
 }
 
 interface VehicleWithImages extends Vehicle {
@@ -58,11 +64,15 @@ export default function MyPostsPage() {
   const [message, setMessage] = useState<Message | null>(null);
   const [regions, setRegions] = useState<Map<number, string>>(new Map());
 
+  // NUEVO: Para mostrar/ocultar sección de gráficos
+  const [showCharts, setShowCharts] = useState(false);
+  // Guarda info si es empresa
+  const [isBusiness, setIsBusiness] = useState<boolean>(false);
+  const [empresaId, setEmpresaId] = useState<string | null>(null);
+
   useEffect(() => {
     const checkAuthAndLoadPosts = async () => {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
+      const { data: { session } } = await supabase.auth.getSession();
 
       if (!session?.user?.id) {
         router.push("/login");
@@ -70,18 +80,58 @@ export default function MyPostsPage() {
       }
 
       setUser(session.user);
-      await loadVehicles(session.user.id); // Pasar el UUID de auth, no el email
+
+      // --- ¡Detecta si es empresa! Guarda en estado para los gráficos
+      let isEmpresa = false;
+      let usuarioId = session.user.id;
+      let empresaUUID: string | null = null;
+
+      const { data: empresaData } = await supabase
+        .from("empresa")
+        .select("id")
+        .eq("usuario_id", usuarioId)
+        .maybeSingle();
+
+      if (empresaData) {
+        isEmpresa = true;
+        empresaUUID = empresaData.id;
+      }
+
+      setIsBusiness(isEmpresa);
+      setEmpresaId(empresaUUID);
+      await loadVehicles(usuarioId);
       setLoading(false);
     };
 
     checkAuthAndLoadPosts();
   }, [router]);
 
+  // =========================================================================
+  // 🔑 LÓGICA DE CARGA DE VEHÍCULOS CORREGIDA PARA USUARIOS Y EMPRESAS
+  // =========================================================================
   const loadVehicles = async (userAuthId: string) => {
     try {
       console.log("User Auth ID:", userAuthId);
 
-      // Cargar regiones
+      // 1. Determinar si el usuario es EMPRESA y obtener su UUID de empresa
+      let isBusiness = false;
+      let vehicleOwnerId: string = userAuthId; // Por defecto, usa el UUID del usuario
+
+      const { data: empresaData } = await supabase
+        .from("empresa")
+        .select("id")
+        .eq("usuario_id", userAuthId)
+        .maybeSingle();
+
+      if (empresaData) {
+        isBusiness = true;
+        vehicleOwnerId = empresaData.id; // ¡Usar el UUID de la empresa!
+        console.log("✅ Usuario es Empresa. ID de Empresa (UUID):", vehicleOwnerId);
+      } else {
+        console.log("👤 Usuario Individual. ID de Usuario (UUID):", vehicleOwnerId);
+      }
+
+      // 2. Cargar catálogos (Regiones, Combustibles, Tipos)
       const { data: regionesData } = await supabase
         .from("region")
         .select("id, nombre_region");
@@ -91,7 +141,6 @@ export default function MyPostsPage() {
       );
       setRegions(regionMap);
 
-      // Cargar catálogos
       const { data: combustibleData } = await supabase
         .from("tipo_combustible")
         .select("id, nombre");
@@ -100,40 +149,32 @@ export default function MyPostsPage() {
         .from("tipo_vehiculo")
         .select("id, nombre");
 
-      // Cargar vehículos relacionados con el usuario (usando UUID de auth)
-      const { data: usuarioVehiculoData, error: uvError } = await supabase
-        .from("usuario_vehiculo")
-        .select("vehiculo_id")
-        .eq("usuario_id", userAuthId);
+      // 3. Cargar los vehículos directamente desde 'vehiculo'
+      let query = supabase.from("vehiculo").select("*");
 
-      console.log("Usuario Vehiculo Data:", usuarioVehiculoData);
-      console.log("Error UV:", uvError);
-
-      if (!usuarioVehiculoData || usuarioVehiculoData.length === 0) {
-        console.log("No se encontraron vehículos para este usuario");
-        setVehicles([]);
-        return;
+      if (isBusiness) {
+        // Consulta por el UUID en empresa_id
+        query = query.eq("empresa_id", vehicleOwnerId).is("usuario_id", null);
+      } else {
+        // Consulta por el UUID en usuario_id
+        query = query.eq("usuario_id", vehicleOwnerId).is("empresa_id", null);
       }
-
-      const vehiculoIds = usuarioVehiculoData.map((uv) => uv.vehiculo_id);
-      console.log("Vehículo IDs:", vehiculoIds);
-
-      // Cargar los vehículos
-      const { data: vehiculosData, error: vError } = await supabase
-        .from("vehiculo")
-        .select("*")
-        .in("id", vehiculoIds)
+      
+      const { data: vehiculosData, error: vError } = await query
         .order("created_at", { ascending: false });
 
       console.log("Vehículos Data:", vehiculosData);
       console.log("Error Vehiculos:", vError);
 
+      if (vError) throw vError;
+
       if (!vehiculosData || vehiculosData.length === 0) {
+        console.log("No se encontraron vehículos para este usuario/empresa");
         setVehicles([]);
         return;
       }
 
-      // Cargar imágenes y mapear nombres
+      // 4. Cargar imágenes y mapear nombres
       const vehiculosConImagenes = await Promise.all(
         vehiculosData.map(async (vehiculo) => {
           // Cargar imágenes
@@ -157,7 +198,7 @@ export default function MyPostsPage() {
             images: imagenesData?.map((img) => img.url_imagen) || [],
             tipo_combustible: combustible?.nombre || "Desconocido",
             tipo_vehiculo: tipoVehiculo?.nombre || "Desconocido",
-          };
+          } as VehicleWithImages;
         })
       );
 
@@ -171,6 +212,7 @@ export default function MyPostsPage() {
       });
     }
   };
+  // =========================================================================
 
   const toggleStatus = async (id: number, currentStatus: boolean) => {
     try {
@@ -211,20 +253,32 @@ export default function MyPostsPage() {
 
       if (imagenesData && imagenesData.length > 0) {
         for (const img of imagenesData) {
-          const fileName = img.url_imagen.split("/").pop();
+          // Asumiendo que la URL de Supabase Storage es: [bucket_url]/[fileName]
+          // Y que el bucket se llama 'vehiculo_imagen'
+          const urlParts = img.url_imagen.split('/');
+          const fileName = urlParts[urlParts.length - 1]; 
+          
           if (fileName) {
-            await supabase.storage.from("vehiculo_imagen").remove([fileName]);
+            // Eliminar solo el archivo, no el path completo
+            const { error: storageError } = await supabase.storage.from("vehiculo_imagen").remove([fileName]);
+            if (storageError) {
+                console.warn("Error al eliminar del storage:", storageError.message);
+            }
           }
         }
       }
 
-      // Eliminar registros de imágenes
+      // Eliminar registros de imágenes (asumiendo ON DELETE CASCADE en la BD)
+      // Si imagen_vehiculo tiene FK a vehiculo con CASCADE, esto podría ser redundante.
+      // Lo mantendremos por seguridad, pero revisa tu esquema de BD.
       await supabase.from("imagen_vehiculo").delete().eq("vehiculo_id", id);
 
-      // Eliminar relación usuario-vehículo
+      // Eliminar vehículo (Asumiendo que las FK de usuario/empresa son NULAS o no hay FK desde vehiculo)
+      // Si tienes una tabla 'usuario_vehiculo' la eliminaremos aquí, si no, puedes quitar esta línea.
+      // Ya eliminamos la dependencia de 'usuario_vehiculo' en la carga, pero la eliminación debe ser completa.
       await supabase.from("usuario_vehiculo").delete().eq("vehiculo_id", id);
 
-      // Eliminar vehículo
+
       const { error } = await supabase.from("vehiculo").delete().eq("id", id);
 
       if (error) throw error;
@@ -288,7 +342,7 @@ export default function MyPostsPage() {
             Volver al Perfil
           </button>
 
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
             <div>
               <h1 className="text-3xl font-bold text-gray-800 flex items-center gap-3">
                 <Car className="w-8 h-8 text-indigo-600" />
@@ -299,17 +353,51 @@ export default function MyPostsPage() {
               </p>
             </div>
 
-            <button
-              onClick={() => router.push("/publication")}
-              className="flex items-center gap-2 bg-gradient-to-r from-indigo-600 to-purple-600 text-white px-6 py-3 rounded-xl hover:shadow-lg transition-all font-semibold"
-            >
-              <Plus className="w-5 h-5" />
-              Nueva Publicación
-            </button>
+            <div className="flex gap-2">
+              <button
+                onClick={() => router.push("/publication")}
+                className="flex items-center gap-2 bg-gradient-to-r from-indigo-600 to-purple-600 text-white px-6 py-3 rounded-xl hover:shadow-lg transition-all font-semibold"
+              >
+                <Plus className="w-5 h-5" />
+                Nueva Publicación
+              </button>
+
+              {/* 🚩 Botón para mostrar/ocultar gráficos */}
+              <button
+                onClick={() => setShowCharts((v) => !v)}
+                className="flex items-center gap-2 bg-indigo-100 text-indigo-700 px-6 py-3 rounded-xl border border-indigo-200 hover:bg-indigo-200 transition-all font-semibold"
+              >
+                📊 Ver estadísticas
+              </button>
+            </div>
           </div>
         </div>
 
-        {/* Messages */}
+        {/* NUEVO: SECCIÓN DE GRÁFICOS */}
+        {showCharts && (
+          <div className="mb-8 p-4 bg-white shadow-md rounded-xl">
+            <h2 className="text-2xl font-bold text-indigo-700 mb-4 flex items-center gap-2">
+              📊 Estadísticas de tus publicaciones
+            </h2>
+            <div className="grid md:grid-cols-2 gap-8">
+              <ChartsVentas 
+              usuarioId={user?.id} 
+              empresaId={empresaId ?? undefined} 
+              isBusiness={isBusiness} />
+              <ChartsPublicaciones 
+              usuarioId={user?.id} 
+              empresaId={empresaId ?? undefined} 
+              isBusiness={isBusiness} />
+              <ChartsCalificaciones 
+              usuarioId={user?.id} 
+              empresaId={empresaId ?? undefined} 
+              isBusiness={isBusiness} />
+
+            </div>
+          </div>
+        )}
+
+        {/* Mensajes */}
         {message && (
           <div
             className={`mb-6 ${
@@ -434,7 +522,7 @@ export default function MyPostsPage() {
                         <Eye className="w-4 h-4" />
                       </button>
 
-                    {/* Ocultar */}
+                      {/* Ocultar */}
                       <button
                         onClick={() => toggleStatus(vehicle.id, vehicle.oculto)}
                         className={`flex items-center justify-center gap-1 px-2 py-2 rounded-lg text-sm font-medium transition-colors ${
@@ -451,7 +539,7 @@ export default function MyPostsPage() {
                         )}
                       </button>
                     
-                    {/* Editar */}
+                      {/* Editar */}
                       <button
                         onClick={() =>
                           router.push(`/publication/${vehicle.id}/edit`)
@@ -462,7 +550,7 @@ export default function MyPostsPage() {
                         <Edit2 className="w-4 h-4" />
                       </button>
 
-                    {/* Eliminar */}
+                      {/* Eliminar */}
                       <button
                         onClick={() => setDeleteModal(vehicle.id)}
                         className="flex items-center justify-center gap-1 px-3 py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 text-sm font-medium transition-colors"

@@ -26,7 +26,7 @@ export default function Header() {
       const { data: usuarioData, error: usuarioError } = await supabase
         .from("usuario")
         .select("id, nombre, apellido, rol")
-        .eq("usuario_id", userId)
+        .eq("id", userId)
         .maybeSingle();
 
       console.log("👤 Búsqueda usuario:", usuarioData, usuarioError);
@@ -57,7 +57,7 @@ export default function Header() {
       // 2. Si no es usuario, verificar si es EMPRESA
       const { data: empresaData, error: empresaError } = await supabase
         .from("empresa")
-        .select("id, nombre_empresa")
+        .select("id, nombre_comercial")
         .eq("usuario_id", userId)
         .maybeSingle();
 
@@ -67,7 +67,7 @@ export default function Header() {
         console.log("✅ ENCONTRADO: Es EMPRESA");
         return {
           accountType: "business" as const,
-          name: empresaData.nombre_empresa || "Empresa",
+          name: empresaData.nombre_comercial || "Empresa",
           route: "/business-profile",
         };
       }
