@@ -81,7 +81,7 @@ export default function BusinessProfilePage() {
       await supabase.auth.signOut();
       setTimeout(() => {
         router.replace("/login");
-      }, 1800); // 1.8 segundos antes de redirigir
+      }, 1500); // 1.5 segundos antes de redirigir
     };
 
   useEffect(() => {

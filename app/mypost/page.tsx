@@ -376,14 +376,7 @@ export default function MyPostsPage() {
         {/* NUEVO: SECCIÓN DE GRÁFICOS */}
         {showCharts && (
           <div className="mb-8 p-4 bg-white shadow-md rounded-xl">
-            <h2 className="text-2xl font-bold text-indigo-700 mb-4 flex items-center gap-2">
-              📊 Estadísticas de tus publicaciones
-            </h2>
             <div className="grid md:grid-cols-2 gap-8">
-              <ChartsVentas 
-              usuarioId={user?.id} 
-              empresaId={empresaId ?? undefined} 
-              isBusiness={isBusiness} />
               <ChartsPublicaciones 
               usuarioId={user?.id} 
               empresaId={empresaId ?? undefined} 
