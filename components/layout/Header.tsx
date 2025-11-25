@@ -182,10 +182,10 @@ export default function Header() {
               </div>
               <div className="hidden sm:block">
                 <span className="text-2xl font-black tracking-tight bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
-                  carNETwork
+                  AutoNacional
                 </span>
                 <div className="text-[10px] text-gray-500 font-medium tracking-wider -mt-1">
-                  ComprAutos
+                  carNETwork
                 </div>
               </div>
             </div>

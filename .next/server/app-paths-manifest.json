@@ -1,7 +1,10 @@
 {
-  "/page": "app/page.js",
-  "/vehicle/[id]/page": "app/vehicle/[id]/page.js",
-  "/business-profile/page": "app/business-profile/page.js",
+  "/icon.png/route": "app/icon.png/route.js",
+  "/shop/page": "app/shop/page.js",
+  "/comparativa/page": "app/comparativa/page.js",
+  "/about/page": "app/about/page.js",
   "/mypost/page": "app/mypost/page.js",
-  "/login/page": "app/login/page.js"
+  "/business-profile/page": "app/business-profile/page.js",
+  "/page": "app/page.js",
+  "/vehicle/[id]/page": "app/vehicle/[id]/page.js"
 }
