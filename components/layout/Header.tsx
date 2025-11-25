@@ -26,7 +26,7 @@ export default function Header() {
       const { data: usuarioData, error: usuarioError } = await supabase
         .from("usuario")
         .select("id, nombre, apellido, rol")
-        .eq("usuario_id", userId)
+        .eq("id", userId)
         .maybeSingle();
 
       console.log("👤 Búsqueda usuario:", usuarioData, usuarioError);
@@ -57,7 +57,7 @@ export default function Header() {
       // 2. Si no es usuario, verificar si es EMPRESA
       const { data: empresaData, error: empresaError } = await supabase
         .from("empresa")
-        .select("id, nombre_empresa")
+        .select("id, nombre_comercial")
         .eq("usuario_id", userId)
         .maybeSingle();
 
@@ -67,7 +67,7 @@ export default function Header() {
         console.log("✅ ENCONTRADO: Es EMPRESA");
         return {
           accountType: "business" as const,
-          name: empresaData.nombre_empresa || "Empresa",
+          name: empresaData.nombre_comercial || "Empresa",
           route: "/business-profile",
         };
       }
@@ -182,10 +182,10 @@ export default function Header() {
               </div>
               <div className="hidden sm:block">
                 <span className="text-2xl font-black tracking-tight bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
-                  carNETwork
+                  AutoNacional
                 </span>
                 <div className="text-[10px] text-gray-500 font-medium tracking-wider -mt-1">
-                  ComprAutos
+                  carNETwork
                 </div>
               </div>
             </div>

@@ -1,86 +1,67 @@
 "use client";
-
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import {
-  Mail,
-  Lock,
-  Eye,
-  EyeOff,
-  AlertCircle,
-  CheckCircle,
-  Loader2,
+  Mail, Lock, Eye, EyeOff, AlertCircle, CheckCircle, Loader2,
 } from "lucide-react";
 
 export default function LoginPage() {
   const router = useRouter();
-  const [loginForm, setLoginForm] = useState({
-    email: "",
-    password: "",
-  });
+  const [loginForm, setLoginForm] = useState({ email: "", password: "" });
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [checkingSession, setCheckingSession] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
 
-  useEffect(() => {
-    checkAuth();
-  }, []);
+  useEffect(() => { checkAuth(); }, []);
 
   const checkAuth = async () => {
     try {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-
+      const { data: { session } } = await supabase.auth.getSession();
       if (session) {
-        // Verificar qué tipo de usuario es
+        const userId = session.user.id;
+        // Buscar usuario
         const { data: userData } = await supabase
           .from("usuario")
           .select("id, rol")
-          .eq("usuario_id", session.user.id)
+          .eq("id", userId)
           .maybeSingle();
 
         if (userData) {
-          // Es usuario normal
-          console.log("✅ Usuario encontrado:", userData.rol);
           if (userData.rol === "administrador") {
-            router.push("/admin/profile");
+            router.replace("/admin/profile");
           } else {
-            router.push("/profile");
+            router.replace("/profile");
           }
           return;
         }
 
-        // Verificar si es empresa
+        // Buscar empresa
         const { data: empresaData } = await supabase
-          .from("empresa")
-          .select("id")
-          .eq("usuario_id", session.user.id)
-          .maybeSingle();
+        .from("empresa")
+        .select("id, validada")
+        .eq("usuario_id", userId)
+        .maybeSingle();
 
         if (empresaData) {
-          // Es empresa
-          console.log("✅ Empresa encontrada");
-          router.push("/business-profile");
+          router.replace("/business-profile");
           return;
         }
 
-        // Si no es ni usuario ni empresa, mantener en login
-        console.log("⚠️ No se encontró tipo de usuario");
+        // Si no hay perfil, desloguea y permite login
+        await supabase.auth.signOut();
       }
     } catch (error) {
       console.error("Error checking auth:", error);
+    } finally {
+      setCheckingSession(false);
     }
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
-    setLoginForm((prev) => ({
-      ...prev,
-      [name]: value,
-    }));
+    setLoginForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
     setErrorMessage("");
   };
 
@@ -89,31 +70,19 @@ export default function LoginPage() {
     setLoading(true);
     setErrorMessage("");
     setSuccessMessage("");
-
     try {
-      // Validar campos
       if (!loginForm.email.trim() || !loginForm.password.trim()) {
         setErrorMessage("Por favor completa todos los campos");
         setLoading(false);
         return;
       }
 
-      if (!loginForm.email.includes("@")) {
-        setErrorMessage("Por favor ingresa un email válido");
-        setLoading(false);
-        return;
-      }
-
-      console.log("🔐 Intentando login con:", loginForm.email);
-
-      // Autenticar con Supabase
       const { data, error: authError } = await supabase.auth.signInWithPassword({
         email: loginForm.email,
         password: loginForm.password,
       });
 
       if (authError) {
-        console.error("❌ Error de autenticación:", authError);
         setErrorMessage(
           authError.message === "Invalid login credentials"
             ? "Email o contraseña incorrectos"
@@ -129,83 +98,64 @@ export default function LoginPage() {
         return;
       }
 
-      console.log("✅ Usuario autenticado:", data.user.id);
+      const userId = data.user.id;
 
-      // Verificar qué tipo de usuario es
-      const { data: userData, error: userError } = await supabase
+      // Buscar usuario normal
+      const { data: userData } = await supabase
         .from("usuario")
         .select("id, rol, habilitado")
-        .eq("usuario_id", data.user.id)
+        .eq("id", userId)
         .maybeSingle();
 
       if (userData) {
-        console.log("✅ Usuario encontrado:", userData);
-
-        // Verificar si está habilitado (solo para usuarios normales, no para admin)
-        if (userData.rol !== "administrador" && !userData.habilitado) {
-          console.log("❌ Usuario deshabilitado");
-          setErrorMessage(
-            "Tu cuenta ha sido deshabilitada. Contacta al administrador."
-          );
+        if (userData.rol !== "administrador" && userData.habilitado === false) {
+          setErrorMessage("Tu cuenta ha sido deshabilitada. Contacta al administrador.");
           await supabase.auth.signOut();
           setLoading(false);
           return;
         }
-
         setSuccessMessage("¡Bienvenido!");
-
-        // Redirigir según el rol
         setTimeout(() => {
-          if (userData.rol === "administrador") {
-            console.log("→ Redirigiendo a admin");
-            router.push("/admin/profile");
-          } else {
-            console.log("→ Redirigiendo a usuario");
-            router.push("/profile");
-          }
-        }, 1500);
+          if (userData.rol === "administrador") router.replace("/admin/profile");
+          else router.replace("/profile");
+        }, 1200);
         return;
       }
 
-      // Si no está en usuario, verificar si es empresa
-      console.log("🔍 Verificando si es empresa...");
-      const { data: empresaData, error: empresaError } = await supabase
+      // Buscar empresa
+      const { data: empresaData } = await supabase
         .from("empresa")
         .select("id, validada")
-        .eq("usuario_id", data.user.id)
+        .eq("usuario_id", userId)
         .maybeSingle();
-
       if (empresaData) {
-        console.log("✅ Empresa encontrada:", empresaData);
-
         setSuccessMessage("¡Bienvenido!");
-        setTimeout(() => {
-          console.log("→ Redirigiendo a empresa");
-          router.push("/business-profile");
-        }, 1500);
+        setTimeout(() => router.replace("/business-profile"), 1200);
         return;
       }
 
-      // No encontró ni usuario ni empresa
-      console.log("❌ No se encontró perfil");
+      // No está en ninguna tabla
       setErrorMessage("No se encontró tu perfil. Contacta al administrador.");
       await supabase.auth.signOut();
       setLoading(false);
     } catch (error: any) {
-      console.error("❌ Error en login:", error);
-      setErrorMessage(
-        error.message || "Ocurrió un error. Por favor intenta de nuevo."
-      );
+      setErrorMessage(error.message || "Ocurrió un error. Intenta de nuevo.");
       setLoading(false);
     }
   };
 
+  if (checkingSession) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-50 to-purple-100">
+        <Loader2 className="w-12 h-12 animate-spin text-indigo-600" />
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-indigo-50 to-purple-100 flex items-center justify-center p-4">
       <div className="w-full max-w-md">
-        {/* Card */}
         <div className="bg-white rounded-2xl shadow-2xl p-8">
-          {/* Logo */}
           <div className="mb-8 text-center">
             <div className="inline-block p-3 bg-gradient-to-br from-indigo-600 to-purple-600 rounded-xl mb-4">
               <Lock className="w-8 h-8 text-white" />
@@ -214,14 +164,12 @@ export default function LoginPage() {
             <p className="text-gray-600 mt-2">ComprAutos</p>
           </div>
 
-          {/* Mensajes */}
           {errorMessage && (
             <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg flex items-start gap-3">
               <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
               <p className="text-red-700 text-sm">{errorMessage}</p>
             </div>
           )}
-
           {successMessage && (
             <div className="mb-4 p-4 bg-green-50 border border-green-200 rounded-lg flex items-start gap-3">
               <CheckCircle className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
@@ -229,13 +177,9 @@ export default function LoginPage() {
             </div>
           )}
 
-          {/* Formulario */}
           <form onSubmit={handleLogin} className="space-y-5">
-            {/* Email */}
             <div>
-              <label htmlFor="email" className="block text-sm font-semibold text-gray-700 mb-2">
-                Email
-              </label>
+              <label htmlFor="email" className="block text-sm font-semibold text-gray-700 mb-2">Email</label>
               <div className="relative">
                 <Mail className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
                 <input
@@ -250,12 +194,8 @@ export default function LoginPage() {
                 />
               </div>
             </div>
-
-            {/* Contraseña */}
             <div>
-              <label htmlFor="password" className="block text-sm font-semibold text-gray-700 mb-2">
-                Contraseña
-              </label>
+              <label htmlFor="password" className="block text-sm font-semibold text-gray-700 mb-2">Contraseña</label>
               <div className="relative">
                 <Lock className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
                 <input
@@ -274,40 +214,24 @@ export default function LoginPage() {
                   className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 transition"
                   disabled={loading}
                 >
-                  {showPassword ? (
-                    <EyeOff className="w-5 h-5" />
-                  ) : (
-                    <Eye className="w-5 h-5" />
-                  )}
+                  {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                 </button>
               </div>
             </div>
-
-            {/* Botón Login */}
             <button
               type="submit"
               disabled={loading}
               className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-bold py-3 rounded-lg hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
-              {loading ? (
-                <>
-                  <Loader2 className="w-5 h-5 animate-spin" />
-                  Iniciando sesión...
-                </>
-              ) : (
-                "Iniciar Sesión"
-              )}
+              {loading ? (<><Loader2 className="w-5 h-5 animate-spin" />Iniciando sesión...</>) : "Iniciar Sesión"}
             </button>
           </form>
 
-          {/* Separador */}
           <div className="my-6 flex items-center gap-3">
             <div className="flex-1 h-px bg-gray-300"></div>
             <span className="text-gray-500 text-sm">¿No tienes cuenta?</span>
             <div className="flex-1 h-px bg-gray-300"></div>
           </div>
-
-          {/* Links de Registro */}
           <div className="space-y-3">
             <button
               onClick={() => router.push("/register")}
@@ -324,8 +248,6 @@ export default function LoginPage() {
               Registrarse como Empresa
             </button>
           </div>
-
-          {/* Footer */}
           <p className="text-center text-gray-500 text-xs mt-6">
             Al iniciar sesión aceptas nuestros términos y condiciones
           </p>

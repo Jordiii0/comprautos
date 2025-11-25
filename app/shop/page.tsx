@@ -5,14 +5,11 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import {
   Car,
-  Filter,
   Search,
   SlidersHorizontal,
   X,
   Loader2,
-  Calendar,
   Gauge,
-  DollarSign,
   ArrowUpDown,
   ChevronDown,
   Eye,
@@ -21,23 +18,11 @@ import {
   MapPin,
 } from "lucide-react";
 
-interface Vehicle {
+// Interfaces de Apoyo
+interface City {
   id: number;
-  precio: number;
-  marca: string;
-  modelo: string;
-  anio: number;
-  kilometraje: number;
-  transmision: string;
-  tipo_combustible: string;
-  estado_vehiculo: string;
-  descripcion: string;
-  cilindrada: string;
-  tipo_vehiculo: string;
-  region: number;
-  ciudad: string;
-  created_at?: string;
-  oculto: boolean;
+  nombre_ciudad: string;
+  region_id: number;
 }
 
 interface CatalogItem {
@@ -48,6 +33,34 @@ interface CatalogItem {
 interface Region {
   id: number;
   nombre_region: string;
+}
+
+// Interfaz Principal del Vehículo
+interface Vehicle {
+  id: number;
+  precio: number;
+  marca: string;
+  modelo: string;
+  anio: number;
+  kilometraje: number;
+  transmision: string;
+  estado_vehiculo: string;
+  descripcion: string;
+  cilindrada: number;
+  oculto: boolean;
+  created_at?: string;
+  
+  // Propiedades de la DB con ID (que vienen del select "*")
+  region_id: number;
+  ciudad_id: number;
+  tipo_vehiculo_id: number;
+  tipo_combustible_id: number;
+  
+  // Propiedades mapeadas (strings que se generan en loadData)
+  tipo_combustible: string;
+  tipo_vehiculo: string;
+  region_nombre: string; 
+  ciudad_nombre: string;
 }
 
 interface VehicleWithImages extends Vehicle {
@@ -76,6 +89,7 @@ export default function ShopPage() {
   const [tiposCombustible, setTiposCombustible] = useState<CatalogItem[]>([]);
   const [tiposVehiculo, setTiposVehiculo] = useState<CatalogItem[]>([]);
   const [regions, setRegions] = useState<Region[]>([]);
+  const [cities, setCities] = useState<City[]>([]);
 
   // Filtros
   const [filters, setFilters] = useState({
@@ -88,7 +102,7 @@ export default function ShopPage() {
     priceMax: "",
     conditions: searchParams?.getAll("conditions") || [],
     vehicleType: "",
-    region: "",
+    region: "", // Este filtro usará el region_id
   });
 
   const [sortBy, setSortBy] = useState("default");
@@ -104,25 +118,41 @@ export default function ShopPage() {
 
   const loadData = async () => {
     try {
-      // Cargar tipos de combustible
+      // 1. Cargar Catálogos y mapear a {id, nombre}
+      
+      // Tipo de Combustible (usa nombre_combustible)
       const { data: combustibleData } = await supabase
         .from("tipo_combustible")
-        .select("id, nombre");
-      setTiposCombustible(combustibleData || []);
+        .select("id, nombre_combustible");
+      const mappedCombustible: CatalogItem[] = combustibleData?.map(c => ({ 
+          id: c.id, 
+          nombre: (c as any).nombre_combustible
+      })) || [];
+      setTiposCombustible(mappedCombustible);
 
-      // Cargar tipos de vehículo
+      // Tipo de Vehículo (asumimos nombre_tipo o usar 'nombre' si ese es el campo)
       const { data: tipoData } = await supabase
         .from("tipo_vehiculo")
-        .select("id, nombre");
-      setTiposVehiculo(tipoData || []);
+        .select("id, nombre_tipo"); 
+      const mappedTipos: CatalogItem[] = tipoData?.map(t => ({ 
+          id: t.id, 
+          nombre: (t as any).nombre_tipo 
+      })) || [];
+      setTiposVehiculo(mappedTipos);
 
-      // Cargar regiones
+      // Regiones (usa nombre_region)
       const { data: regionesData } = await supabase
         .from("region")
         .select("id, nombre_region");
       setRegions(regionesData || []);
 
-      // Cargar vehículos con sus imágenes (SOLO NO OCULTOS)
+      // Ciudades (usa nombre_ciudad)
+      const { data: ciudadesData } = await supabase
+        .from("ciudad")
+        .select("id, nombre_ciudad, region_id");
+      setCities(ciudadesData || []);
+
+      // 2. Cargar Vehículos
       const { data: vehiculosData } = await supabase
         .from("vehiculo")
         .select("*")
@@ -135,8 +165,8 @@ export default function ShopPage() {
         return;
       }
 
-      // Cargar imágenes y mapear nombres para cada vehículo
-      const vehiculosConImagenes = await Promise.all(
+      // 3. Mapear IDs a nombres en el objeto vehículo
+      const vehiculosConImagenes: VehicleWithImages[] = await Promise.all(
         vehiculosData.map(async (vehiculo) => {
           // Cargar imágenes
           const { data: imagenesData } = await supabase
@@ -144,22 +174,30 @@ export default function ShopPage() {
             .select("url_imagen")
             .eq("vehiculo_id", vehiculo.id);
 
-          // Buscar nombre de combustible
-          const combustible = combustibleData?.find(
-            (c) => c.id === vehiculo.tipo_combustible_id
-          );
-
-          // Buscar nombre de tipo de vehículo
-          const tipoVehiculo = tipoData?.find(
-            (t) => t.id === vehiculo.tipo_vehiculo_id
-          );
+          // Obtener nombres de catálogos
+          const combustible = mappedCombustible.find((c) => c.id === vehiculo.tipo_combustible_id);
+          const tipoVehiculo = mappedTipos.find((t) => t.id === vehiculo.tipo_vehiculo_id);
+          const ciudad = ciudadesData?.find((c) => c.id === vehiculo.ciudad_id);
+          const region = regionesData?.find((r) => r.id === vehiculo.region_id);
 
           return {
             ...vehiculo,
-            images: imagenesData?.map((img) => img.url_imagen) || [],
-            tipo_combustible: combustible?.nombre || "Desconocido",
-            tipo_vehiculo: tipoVehiculo?.nombre || "Desconocido",
-          };
+            images: imagenesData?.map((img) => img.url_imagen) || [], // <-- Se añade la propiedad 'images' aquí
+            
+            // Asignación de Nombres (Combustible/Tipo)
+            tipo_combustible: 
+                combustible?.nombre || 
+                vehiculo.tipo_combustible_id?.toString() || 
+                "No especificado",
+            tipo_vehiculo: 
+                tipoVehiculo?.nombre || 
+                vehiculo.tipo_vehiculo_id?.toString() || 
+                "No especificado",
+
+            // Asignación de Nombres (Ubicación)
+            ciudad_nombre: ciudad?.nombre_ciudad || "Ciudad Desconocida",
+            region_nombre: region?.nombre_region || "Región Desconocida",
+          } as VehicleWithImages; // <--- CORRECCIÓN DE TIPO A VehicleWithImages
         })
       );
 
@@ -223,9 +261,9 @@ export default function ShopPage() {
       );
     }
 
-    // Filtro de región
+    // Filtro de región (Usa el region_id de la tabla vehiculo)
     if (filters.region) {
-      filtered = filtered.filter((v) => v.region === parseInt(filters.region));
+      filtered = filtered.filter((v) => v.region_id === parseInt(filters.region));
     }
 
     // Filtro de condición/estado
@@ -304,6 +342,7 @@ export default function ShopPage() {
     );
   };
 
+  // Esta función ya no es necesaria para las tarjetas, pero se mantiene para los filtros
   const getRegionName = (regionId: number) => {
     return (
       regions.find((r) => r.id === regionId)?.nombre_region || "Desconocida"
@@ -627,8 +666,9 @@ export default function ShopPage() {
                     </div>
                     <div className="flex items-center gap-1 text-gray-500">
                       <MapPin className="w-4 h-4" />
+                      {/* Mostrar Ciudad, Región */}
                       <span>
-                        {vehicle.ciudad}, {getRegionName(vehicle.region)}
+                        {vehicle.ciudad_nombre}, {vehicle.region_nombre}
                       </span>
                     </div>
                   </div>
